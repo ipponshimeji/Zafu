@@ -1,0 +1,7 @@
+# OSS used in this software
+
+This software is dynamically linked with the following OSS:
+
+* .NET Core
+  Copyright (c) .NET Foundation and Contributors All rights reserved.
+  license (MIT): https://github.com/dotnet/core/blob/master/LICENSE.TXT 
