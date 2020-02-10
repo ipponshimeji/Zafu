@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29613.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utilities", "Utilities\Utilities.csproj", "{5F6E37FB-C120-482A-9F6D-E717F93883DE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Utilities", "Utilities\Utilities.csproj", "{5F6E37FB-C120-482A-9F6D-E717F93883DE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utilities_test", "Utilities_test\Utilities_test.csproj", "{687F53E6-11F7-4399-A1B8-E85F9CBE1248}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Utilities_test", "Utilities_test\Utilities_test.csproj", "{687F53E6-11F7-4399-A1B8-E85F9CBE1248}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
