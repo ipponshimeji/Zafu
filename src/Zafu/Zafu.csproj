@@ -8,7 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Utilities\" />
     <Folder Include="ObjectModel\" />
   </ItemGroup>
 

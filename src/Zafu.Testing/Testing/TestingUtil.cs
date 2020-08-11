@@ -15,7 +15,7 @@ namespace Zafu.Testing {
 		#endregion
 
 
-		#region utilities
+		#region methods
 
 		public static IEnumerable<object[]> ToTestData<T>(this IEnumerable<T> data) where T : class {
 			// check argument

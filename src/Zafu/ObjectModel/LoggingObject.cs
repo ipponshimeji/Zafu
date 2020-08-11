@@ -1,6 +1,6 @@
 ﻿using System;
 using Microsoft.Extensions.Logging;
-using Zafu.Utilities;
+using Zafu.Logging;
 
 
 namespace Zafu.ObjectModel {

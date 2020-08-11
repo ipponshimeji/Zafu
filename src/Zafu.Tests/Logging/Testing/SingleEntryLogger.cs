@@ -2,8 +2,12 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
-namespace Zafu.Utilities.Testing {
-	public class SingleLogger: ILogger {
+namespace Zafu.Logging.Testing {
+	/// <summary>
+	/// The logger which can store only one log entry.
+	/// This object is used in test of logging methods to capture its log output. 
+	/// </summary>
+	public class SingleEntryLogger: ILogger {
 		#region types
 
 		/// <remarks>

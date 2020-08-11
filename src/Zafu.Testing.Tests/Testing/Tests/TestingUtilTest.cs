@@ -6,7 +6,7 @@ using Xunit;
 using Zafu.Testing;
 
 
-namespace Zafu.Testing.Test {
+namespace Zafu.Testing.Tests {
 	public class TestingUtilTest {
 		#region GetDisplayText
 
