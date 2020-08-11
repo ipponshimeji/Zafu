@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <IsPackable>false</IsPackable>
-    <AssemblyName>Zafu.Test</AssemblyName>
+    <AssemblyName>Zafu.Tests</AssemblyName>
     <RootNamespace>Zafu</RootNamespace>
     <Nullable>enable</Nullable>
   </PropertyGroup>

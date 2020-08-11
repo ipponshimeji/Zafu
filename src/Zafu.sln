@@ -9,11 +9,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Utilities_test", "Utilities
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zafu", "Zafu\Zafu.csproj", "{19FD6A61-6136-4885-8955-5DAF8C27A34A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zafu.Test", "Zafu.Test\Zafu.Test.csproj", "{8C4D3363-3641-49DC-A918-C8E01C4D104C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zafu.Tests", "Zafu.Tests\Zafu.Tests.csproj", "{8C4D3363-3641-49DC-A918-C8E01C4D104C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zafu.Testing", "Zafu.Testing\Zafu.Testing.csproj", "{6356DD98-9ABE-4EFB-9A80-49CB96ACC341}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zafu.Testing.Test", "Zafu.Testing.Test\Zafu.Testing.Test.csproj", "{C3B8EEA7-B977-4F59-B358-A4A9BC2800EC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Zafu.Testing.Tests", "Zafu.Testing.Tests\Zafu.Testing.Tests.csproj", "{C3B8EEA7-B977-4F59-B358-A4A9BC2800EC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
