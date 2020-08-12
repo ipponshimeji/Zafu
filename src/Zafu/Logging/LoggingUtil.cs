@@ -22,6 +22,8 @@ namespace Zafu.Logging {
 
 		public static ILogger DefaultLogger => defaultLogger;
 
+		public static ILogger NullLogger => Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+
 		#endregion
 
 
@@ -78,36 +80,41 @@ namespace Zafu.Logging {
 			return message;
 		}
 
-		public static void Log(ILogger logger, LogLevel logLevel, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+		public static void Log(ILogger? logger, LogLevel logLevel, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			// check argument
 			if (logger == null) {
-				throw new ArgumentNullException(nameof(logger));
+				// nothing to do
+				return;
 			}
 
-			logger.Log(logLevel, eventId, FormatLogMessage(header, message), exception, FormatLog);
+			try {
+				logger.Log(logLevel, eventId, FormatLogMessage(header, message), exception, FormatLog);
+			} catch (Exception) {
+				// continue
+			}
 		}
 
-		public static void LogTrace(ILogger logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+		public static void LogTrace(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			Log(logger, LogLevel.Trace, header, message, exception, eventId);
 		}
 
-		public static void LogDebug(ILogger logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+		public static void LogDebug(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			Log(logger, LogLevel.Debug, header, message, exception, eventId);
 		}
 
-		public static void LogInformation(ILogger logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+		public static void LogInformation(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			Log(logger, LogLevel.Information, header, message, exception, eventId);
 		}
 
-		public static void LogWarning(ILogger logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+		public static void LogWarning(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			Log(logger, LogLevel.Warning, header, message, exception, eventId);
 		}
 
-		public static void LogError(ILogger logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+		public static void LogError(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			Log(logger, LogLevel.Error, header, message, exception, eventId);
 		}
 
-		public static void LogCritical(ILogger logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+		public static void LogCritical(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			Log(logger, LogLevel.Critical, header, message, exception, eventId);
 		}
 

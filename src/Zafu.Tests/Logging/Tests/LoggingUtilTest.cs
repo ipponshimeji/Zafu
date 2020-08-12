@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Zafu.Testing;
-using Zafu.Logging.Testing;
 using Xunit;
+using Zafu.Testing;
+using Zafu.Testing.Logging;
 
 namespace Zafu.Logging.Tests {
 	public class LoggingUtilTest {
@@ -55,18 +55,17 @@ namespace Zafu.Logging.Tests {
 
 			#region methods
 
-			public void AssertLog(LogLevel expectedLogLevel, object? expectedFormatter, SingleEntryLogger actualLog) {
+			public void AssertLog(LogLevel expectedLogLevel, object? expectedFormatter, SingleEntryLogger actual) {
 				// check argument
-				if (actualLog == null) {
-					throw new ArgumentNullException(nameof(actualLog));
+				if (actual == null) {
+					throw new ArgumentNullException(nameof(actual));
 				}
 
 				// assert
 				string expectedState = LoggingUtil.FormatLogMessage(this.Header, this.Message);
-				SingleEntryLogger.EntryData? actual = actualLog.Entry;
 
-				Assert.NotNull(actual); // actually logged?
-				Debug.Assert(actual != null);
+				Assert.True(actual.Logged); // actually logged?
+				Assert.Equal(typeof(string), actual.StateType);
 				Assert.Equal(expectedLogLevel, actual.LogLevel);
 				Assert.Equal(this.EventId, actual.EventId);
 				Assert.Equal(expectedState, actual.State);
@@ -113,32 +112,29 @@ namespace Zafu.Logging.Tests {
 				// arrange
 
 				// act
-				SingleEntryLogger actualLog = new SingleEntryLogger();
-				CallTargetOmittingArguments(actualLog, "name", "content");
+				SingleEntryLogger actual = new SingleEntryLogger();
+				CallTargetOmittingArguments(actual, "name", "content");
 
 				// assert
-				SingleEntryLogger.EntryData? actualEntry = actualLog.Entry;
-
-				Assert.NotNull(actualEntry); // actually logged?
-				Debug.Assert(actualEntry != null);
-				Assert.Equal(this.LogLevel, actualEntry.LogLevel);
+				Assert.True(actual.Logged); // actually logged?
+				Assert.Equal(typeof(string), actual.StateType);
+				Assert.Equal(this.LogLevel, actual.LogLevel);
 				// logged the default values?
-				Assert.Equal(default(EventId), actualEntry.EventId);
-				Assert.Null(actualEntry.Exception);
+				Assert.Equal(default(EventId), actual.EventId);
+				Assert.Null(actual.Exception);
 			}
 
 			[Fact(DisplayName = "logger: null")]
 			public void logger_null() {
 				// arrange
-				ILogger logger = null!;
+				ILogger? logger = null;
 
 				// act
-				ArgumentNullException actual = Assert.Throws<ArgumentNullException>(() => {
-					CallTarget(logger, "name", "content", null, default(EventId));
-				});
+				CallTarget(logger, "name", "content", null, default(EventId));
 
 				// assert
-				Assert.Equal("logger", actual.ParamName);
+				// nothing should happen, no ArgumentNullException should be thrown
+				// LoggingUtil.LogX() methods do nothing if the logger argument is null. 
 			}
 
 			#endregion
@@ -148,9 +144,9 @@ namespace Zafu.Logging.Tests {
 
 			protected abstract LogLevel LogLevel { get; }
 
-			protected abstract void CallTarget(ILogger logger, string? header, string? message, Exception? exception, EventId eventId);
+			protected abstract void CallTarget(ILogger ?logger, string? header, string? message, Exception? exception, EventId eventId);
 
-			protected abstract void CallTargetOmittingArguments(ILogger logger, string? header, string? message);
+			protected abstract void CallTargetOmittingArguments(ILogger? logger, string? header, string? message);
 
 			#endregion
 		}
@@ -317,11 +313,11 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Trace;
 
-			protected override void CallTarget(ILogger logger, string? header, string? message, Exception? exception, EventId eventId) {
+			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
 				LoggingUtil.LogTrace(logger, header, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger logger, string? header, string? message) {
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
 				LoggingUtil.LogTrace(logger, header, message);
 			}
 
@@ -338,11 +334,11 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Debug;
 
-			protected override void CallTarget(ILogger logger, string? header, string? message, Exception? exception, EventId eventId) {
+			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
 				LoggingUtil.LogDebug(logger, header, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger logger, string? header, string? message) {
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
 				LoggingUtil.LogDebug(logger, header, message);
 			}
 
@@ -359,11 +355,11 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Information;
 
-			protected override void CallTarget(ILogger logger, string? header, string? message, Exception? exception, EventId eventId) {
+			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
 				LoggingUtil.LogInformation(logger, header, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger logger, string? header, string? message) {
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
 				LoggingUtil.LogInformation(logger, header, message);
 			}
 
@@ -380,11 +376,11 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Warning;
 
-			protected override void CallTarget(ILogger logger, string? header, string? message, Exception? exception, EventId eventId) {
+			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
 				LoggingUtil.LogWarning(logger, header, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger logger, string? header, string? message) {
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
 				LoggingUtil.LogWarning(logger, header, message);
 			}
 
@@ -401,11 +397,11 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Error;
 
-			protected override void CallTarget(ILogger logger, string? header, string? message, Exception? exception, EventId eventId) {
+			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
 				LoggingUtil.LogError(logger, header, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger logger, string? header, string? message) {
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
 				LoggingUtil.LogError(logger, header, message);
 			}
 
@@ -422,11 +418,11 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Critical;
 
-			protected override void CallTarget(ILogger logger, string? header, string? message, Exception? exception, EventId eventId) {
+			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
 				LoggingUtil.LogCritical(logger, header, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger logger, string? header, string? message) {
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
 				LoggingUtil.LogCritical(logger, header, message);
 			}
 

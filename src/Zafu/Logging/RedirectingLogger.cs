@@ -4,48 +4,11 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Zafu.Disposing;
 
 namespace Zafu.Logging {
 	public class RedirectingLogger: ILogger {
-		#region types
-
-		protected class RedirectingScope: IDisposable {
-			#region data
-
-			private IEnumerable<IDisposable>? targetScopes;
-
-			#endregion
-
-
-			#region creation & disposal
-
-			public RedirectingScope(IEnumerable<IDisposable>? targetScopes) {
-				// check argument
-				// targetScopes can be null
-
-				// initialize member
-				this.targetScopes = targetScopes;
-			}
-
-			public void Dispose() {
-				IEnumerable<IDisposable>? targetScopes = Interlocked.Exchange(ref this.targetScopes, null);
-				if (targetScopes != null) {
-					foreach (IDisposable targetScope in targetScopes) {
-						try {
-							targetScope.Dispose();
-						} catch (Exception) {
-							// continue
-						}
-					}
-				}
-			}
-
-			#endregion
-		}
-
-		#endregion
-
-
 		#region data
 
 		private readonly object instanceLocker = new object();
@@ -133,7 +96,7 @@ namespace Zafu.Logging {
 
 			// TODO: create NotNull extension?
 			IDisposable[] targetScopes = loggers.Select(l => beginScope(l, state)).Where(d => d != null).ToArray()!;
-			return new RedirectingScope(targetScopes);
+			return new DisposableCollection(targetScopes, "Scope of the Default Logger", this);
 		}
 
 		/// <remarks>
