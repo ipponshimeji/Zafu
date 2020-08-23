@@ -66,10 +66,18 @@ namespace Zafu.Logging {
 		#region methods
 
 		public virtual void EndScope(IDisposable scope) {
+			// check argument
+			// The 'scope' argument is not checked though it is not nullable formally.
+			// The null scope will be ignored.
+
 			DisposingUtil.DisposeIgnoringException(scope);
 		}
 
 		public virtual void EndScope(IEnumerable<IDisposable?> scopes) {
+			// check argument
+			// The 'scopes' argument is not checked though it is not nullable formally.
+			// The null scopes will be ignored.
+
 			DisposingUtil.DisposeIgnoringException(scopes);
 		}
 

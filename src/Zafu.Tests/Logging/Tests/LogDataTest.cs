@@ -10,11 +10,11 @@ namespace Zafu.Logging.Tests {
 	public class LogDataTest {
 		#region types
 
-		// The derived class from LogEntry to expose GetLogMethodInfo() and GetLogArguments() as public.
-		class TestingLogEntry: LogData {
+		// The derived class from LogData to expose GetLogMethodInfo() and GetLogArguments() as public.
+		class TestingLogData: LogData {
 			#region creation
 
-			public TestingLogEntry(LogData src) : base(src) {
+			public TestingLogData(LogData src) : base(src) {
 			}
 
 			#endregion
@@ -38,7 +38,7 @@ namespace Zafu.Logging.Tests {
 
 		#region samples
 
-		public static LogData Sample = new LogData(typeof(Version), LogLevel.Information, new EventId(51, "test"), new Version(1, 2), new ApplicationException(), (Func<Version?, Exception?, string>)VersionFormatter);
+		public static readonly LogData Sample = new LogData(typeof(Version), LogLevel.Information, new EventId(51, "test"), new Version(1, 2), new ApplicationException(), (Func<Version?, Exception?, string>)VersionFormatter);
 
 		private static string VersionFormatter(Version? state, Exception? exception) {
 			return (state != null) ? state.ToString() : string.Empty;
@@ -145,11 +145,11 @@ namespace Zafu.Logging.Tests {
 				Assert.Equal(!expected, actual_inequality);
 
 				if (object.ReferenceEquals(x, null) == false) {
-					// act (Equal methods)
+					// act (Equals methods)
 					bool actual_equal = x.Equals(y);
 					bool actual_objectEqual = x.Equals((object?)y);
 
-					// assert (Equal methods)
+					// assert (Equals methods)
 					Assert.Equal(expected, actual_equal);
 					Assert.Equal(expected, actual_objectEqual);
 				}
@@ -267,6 +267,20 @@ namespace Zafu.Logging.Tests {
 
 				// act & assert
 				Test(x, y, expected: false);
+			}
+
+			[Fact(DisplayName = "different; incompatible type")]
+			public void different_incompatible_type() {
+				// arrange
+				LogData x = Sample;
+				// object of incompatible type (string)
+				object y = "abc";
+
+				// act
+				bool actual = x.Equals(y);
+
+				// assert
+				Assert.False(actual);
 			}
 
 			#endregion
@@ -450,12 +464,12 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "general")]
 			public void general() {
 				// arrange
-				// Use wrapper class (TestingLogEntry) to access protected methods of LogEntry. 
-				TestingLogEntry sample = new TestingLogEntry(Sample);
+				// Use wrapper class (TestingLogData) to access protected methods of LogData. 
+				TestingLogData sample = new TestingLogData(Sample);
 
 				// act
 				MethodInfo actual = sample.GetLogMethodInfo();
-				string str = actual.ToString();
+				string? str = actual.ToString();
 
 				// assert
 				Assert.Equal("Void Log[Version](Microsoft.Extensions.Logging.LogLevel, Microsoft.Extensions.Logging.EventId, System.Version, System.Exception, System.Func`3[System.Version,System.Exception,System.String])", actual.ToString());
@@ -471,8 +485,8 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "general")]
 			public void general() {
 				// arrange
-				// Use wrapper class (TestingLogEntry) to access protected methods of LogEntry. 
-				TestingLogEntry sample = new TestingLogEntry(Sample);
+				// Use wrapper class (TestingLogData) to access protected methods of LogData. 
+				TestingLogData sample = new TestingLogData(Sample);
 				object? expected = new object?[] {
 					sample.LogLevel, sample.EventId, sample.State, sample.Exception, sample.Formatter
 				};
