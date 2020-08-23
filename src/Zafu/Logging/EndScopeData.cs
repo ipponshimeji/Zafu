@@ -4,7 +4,7 @@ using System.Diagnostics;
 using Zafu.Disposing;
 
 namespace Zafu.Logging {
-	public class EndScopeEntry: Entry, IEquatable<EndScopeEntry> {
+	public class EndScopeData: LoggingData, IEquatable<EndScopeData> {
 		#region data
 
 		public readonly object? Scope;
@@ -14,7 +14,7 @@ namespace Zafu.Logging {
 
 		#region creation
 
-		public EndScopeEntry(object? scope): base() {
+		public EndScopeData(object? scope): base() {
 			// check argument
 			// scope can be null
 
@@ -22,7 +22,7 @@ namespace Zafu.Logging {
 			this.Scope = scope;
 		}
 
-		public EndScopeEntry(EndScopeEntry src): base(src) {
+		public EndScopeData(EndScopeData src): base(src) {
 			// check argument
 			Debug.Assert(src != null);
 
@@ -35,7 +35,7 @@ namespace Zafu.Logging {
 
 		#region operators
 
-		public static bool operator ==(EndScopeEntry? x, EndScopeEntry? y) {
+		public static bool operator ==(EndScopeData? x, EndScopeData? y) {
 			if (object.ReferenceEquals(x, null)) {
 				return object.ReferenceEquals(y, null);
 			} else {
@@ -47,16 +47,16 @@ namespace Zafu.Logging {
 			}
 		}
 
-		public static bool operator !=(EndScopeEntry? x, EndScopeEntry? y) {
+		public static bool operator !=(EndScopeData? x, EndScopeData? y) {
 			return !(x == y);
 		}
 
 		#endregion
 
 
-		#region IEquatable<EndScopeEntry>
+		#region IEquatable<EndScopeData>
 
-		public bool Equals(EndScopeEntry? other) {
+		public bool Equals(EndScopeData? other) {
 			return (this == other);
 		}
 
@@ -69,7 +69,7 @@ namespace Zafu.Logging {
 			DisposingUtil.DisposeIgnoringException(scope);
 		}
 
-		public virtual void EndScope(IEnumerable<IDisposable> scopes) {
+		public virtual void EndScope(IEnumerable<IDisposable?> scopes) {
 			DisposingUtil.DisposeIgnoringException(scopes);
 		}
 
@@ -79,7 +79,7 @@ namespace Zafu.Logging {
 		#region overrides
 
 		public override bool Equals(object? obj) {
-			return (this == obj as EndScopeEntry);
+			return (this == obj as EndScopeData);
 		}
 
 		public override int GetHashCode() {

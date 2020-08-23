@@ -7,14 +7,14 @@ using Xunit;
 using Zafu.Testing.Logging;
 
 namespace Zafu.Logging.Tests {
-	public class LogEntryTest {
+	public class LogDataTest {
 		#region types
 
 		// The derived class from LogEntry to expose GetLogMethodInfo() and GetLogArguments() as public.
-		class TestingLogEntry: LogEntry {
+		class TestingLogEntry: LogData {
 			#region creation
 
-			public TestingLogEntry(LogEntry src) : base(src) {
+			public TestingLogEntry(LogData src) : base(src) {
 			}
 
 			#endregion
@@ -38,7 +38,7 @@ namespace Zafu.Logging.Tests {
 
 		#region samples
 
-		public static LogEntry Sample = new LogEntry(typeof(Version), LogLevel.Information, new EventId(51, "test"), new Version(1, 2), new ApplicationException(), (Func<Version?, Exception?, string>)VersionFormatter);
+		public static LogData Sample = new LogData(typeof(Version), LogLevel.Information, new EventId(51, "test"), new Version(1, 2), new ApplicationException(), (Func<Version?, Exception?, string>)VersionFormatter);
 
 		private static string VersionFormatter(Version? state, Exception? exception) {
 			return (state != null) ? state.ToString() : string.Empty;
@@ -65,7 +65,7 @@ namespace Zafu.Logging.Tests {
 				Delegate formatter = (Func<Uri?, Exception?, string>)UriFormatter;
 
 				// act
-				LogEntry actual = new LogEntry(stateType, logLevel, eventId, state, exception, formatter);
+				LogData actual = new LogData(stateType, logLevel, eventId, state, exception, formatter);
 
 				// assert
 				Assert.Equal(stateType, actual.StateType);
@@ -88,7 +88,7 @@ namespace Zafu.Logging.Tests {
 
 				// act
 				ArgumentNullException actual = Assert.Throws<ArgumentNullException>(() => {
-					new LogEntry(stateType, logLevel, eventId, state, exception, formatter);
+					new LogData(stateType, logLevel, eventId, state, exception, formatter);
 				});
 
 				// assert
@@ -98,10 +98,10 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "copy constructor; general")]
 			public void Copy_general() {
 				// arrange
-				LogEntry src = Sample;
+				LogData src = Sample;
 
 				// act
-				LogEntry actual = new LogEntry(src);
+				LogData actual = new LogData(src);
 
 				// assert
 				Assert.Equal(src.StateType, actual.StateType);
@@ -115,11 +115,11 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "copy constructor; src: null")]
 			public void Copy_src_null() {
 				// arrange
-				LogEntry src = null!;
+				LogData src = null!;
 
 				// act
 				ArgumentNullException actual = Assert.Throws<ArgumentNullException>(() => {
-					new LogEntry(src);
+					new LogData(src);
 				});
 
 				// assert
@@ -135,7 +135,7 @@ namespace Zafu.Logging.Tests {
 		public class Comparison {
 			#region utilities
 
-			protected void Test(LogEntry? x, LogEntry? y, bool expected) {
+			protected void Test(LogData? x, LogData? y, bool expected) {
 				// act (operators)
 				bool actual_equality = (x == y);
 				bool actual_inequality = (x != y);
@@ -163,9 +163,9 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "same; general")]
 			public void same_general() {
 				// arrange
-				LogEntry x = Sample;
+				LogData x = Sample;
 				// create a clone not to equal to x as a reference 
-				LogEntry y = new LogEntry(x);
+				LogData y = new LogData(x);
 				Debug.Assert(object.ReferenceEquals(x, y) == false);
 
 				// act & assert
@@ -175,8 +175,8 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "same; null")]
 			public void same_null() {
 				// arrange
-				LogEntry? x = null;
-				LogEntry? y = null;
+				LogData? x = null;
+				LogData? y = null;
 
 				// act & assert
 				Test(x, y, expected: true);
@@ -194,11 +194,11 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "different; StateType")]
 			public void different_StateType() {
 				// arrange
-				LogEntry x = Sample;
+				LogData x = Sample;
 				// different from x only at StateType
 				Type differentValue = typeof(Uri);
 				Debug.Assert(differentValue != x.StateType);
-				LogEntry y = new LogEntry(differentValue, x.LogLevel, x.EventId, x.State, x.Exception, x.Formatter);
+				LogData y = new LogData(differentValue, x.LogLevel, x.EventId, x.State, x.Exception, x.Formatter);
 
 				// act & assert
 				Test(x, y, expected: false);
@@ -207,11 +207,11 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "different; LogLevel")]
 			public void different_LogLevel() {
 				// arrange
-				LogEntry x = Sample;
+				LogData x = Sample;
 				// different from x only at LogLevel
 				LogLevel differentValue = LogLevel.Trace;
 				Debug.Assert(differentValue != x.LogLevel);
-				LogEntry y = new LogEntry(x.StateType, differentValue, x.EventId, x.State, x.Exception, x.Formatter);
+				LogData y = new LogData(x.StateType, differentValue, x.EventId, x.State, x.Exception, x.Formatter);
 
 				// act & assert
 				Test(x, y, expected: false);
@@ -220,11 +220,11 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "different; EventId")]
 			public void different_EventId() {
 				// arrange
-				LogEntry x = Sample;
+				LogData x = Sample;
 				// different from x only at EventId
 				EventId differentValue = new EventId(99);
 				Debug.Assert(differentValue != x.EventId);
-				LogEntry y = new LogEntry(x.StateType, x.LogLevel, differentValue, x.State, x.Exception, x.Formatter);
+				LogData y = new LogData(x.StateType, x.LogLevel, differentValue, x.State, x.Exception, x.Formatter);
 
 				// act & assert
 				Test(x, y, expected: false);
@@ -233,11 +233,11 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "different; State")]
 			public void different_State() {
 				// arrange
-				LogEntry x = Sample;
+				LogData x = Sample;
 				// different from x only at State
 				object differentValue = new Version(9, 5);
 				Debug.Assert(differentValue != x.State);
-				LogEntry y = new LogEntry(x.StateType, x.LogLevel, x.EventId, differentValue, x.Exception, x.Formatter);
+				LogData y = new LogData(x.StateType, x.LogLevel, x.EventId, differentValue, x.Exception, x.Formatter);
 
 				// act & assert
 				Test(x, y, expected: false);
@@ -246,11 +246,11 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "different; Exception")]
 			public void different_Exception() {
 				// arrange
-				LogEntry x = Sample;
+				LogData x = Sample;
 				// different from x only at Exception
 				Exception differentValue = new NotImplementedException();
 				Debug.Assert(differentValue != x.Exception);
-				LogEntry y = new LogEntry(x.StateType, x.LogLevel, x.EventId, x.State, differentValue, x.Formatter);
+				LogData y = new LogData(x.StateType, x.LogLevel, x.EventId, x.State, differentValue, x.Formatter);
 
 				// act & assert
 				Test(x, y, expected: false);
@@ -259,11 +259,11 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "different; Formatter")]
 			public void different_Formatter() {
 				// arrange
-				LogEntry x = Sample;
+				LogData x = Sample;
 				// different from x only at Formatter
 				Delegate differentValue = (Func<Uri?, Exception?, string>)UriFormatter;
 				Debug.Assert(differentValue != x.Formatter);
-				LogEntry y = new LogEntry(x.StateType, x.LogLevel, x.EventId, x.State, x.Exception, differentValue);
+				LogData y = new LogData(x.StateType, x.LogLevel, x.EventId, x.State, x.Exception, differentValue);
 
 				// act & assert
 				Test(x, y, expected: false);
@@ -281,9 +281,9 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "same")]
 			public void same() {
 				// arrange
-				LogEntry x = Sample;
+				LogData x = Sample;
 				// create a clone not to equal to x as a reference 
-				LogEntry y = new LogEntry(x);
+				LogData y = new LogData(x);
 				Debug.Assert(object.ReferenceEquals(x, y) == false);
 
 				// act
@@ -297,8 +297,8 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "different")]
 			public void different() {
 				// arrange
-				LogEntry x = Sample;
-				LogEntry y = new LogEntry(typeof(Uri), LogLevel.Critical, default(EventId), null, null, null);
+				LogData x = Sample;
+				LogData y = new LogData(typeof(Uri), LogLevel.Critical, default(EventId), null, null, null);
 
 				// act
 				int actual_x = x.GetHashCode();
@@ -322,8 +322,8 @@ namespace Zafu.Logging.Tests {
 			/// </summary>
 			/// <param name="formatter"></param>
 			/// <returns></returns>
-			protected static LogEntry GetSample(LogEntry src, Delegate? formatter) {
-				return new LogEntry(src.StateType, src.LogLevel, src.EventId, src.State, src.Exception, formatter);
+			protected static LogData GetSample(LogData src, Delegate? formatter) {
+				return new LogData(src.StateType, src.LogLevel, src.EventId, src.State, src.Exception, formatter);
 			}
 
 			#endregion
@@ -334,7 +334,7 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "general")]
 			public void general() {
 				// arrange
-				LogEntry sample = Sample;
+				LogData sample = Sample;
 
 				// act
 				string? actual = sample.GetMessage();
@@ -346,7 +346,7 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "Formatter: null")]
 			public void Formatter_null() {
 				// arrange
-				LogEntry sample = GetSample(Sample, null);
+				LogData sample = GetSample(Sample, null);
 
 				// act
 				string? actual = sample.GetMessage();
@@ -359,7 +359,7 @@ namespace Zafu.Logging.Tests {
 			public void Formatter_custom() {
 				// arrange
 				Func<Version?, Exception?, string> formatter = (var, e) => "OK?";
-				LogEntry sample = GetSample(Sample, formatter);
+				LogData sample = GetSample(Sample, formatter);
 
 				// act
 				string? actual = sample.GetMessage();
@@ -380,7 +380,7 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "single; general")]
 			public void single_general() {
 				// arrange
-				LogEntry sample = Sample;
+				LogData sample = Sample;
 				SingleEntryLogger logger = new SingleEntryLogger();
 				Debug.Assert(logger.Logged == false);
 
@@ -388,13 +388,13 @@ namespace Zafu.Logging.Tests {
 				sample.LogTo(logger);
 
 				// assert
-				Assert.Equal(sample, logger.Entry);
+				Assert.Equal(sample, logger.Data);
 			}
 
 			[Fact(DisplayName = "single; logger: null")]
 			public void single_logger_null() {
 				// arrange
-				LogEntry sample = Sample;
+				LogData sample = Sample;
 				ILogger logger = null!;
 
 				// act
@@ -409,7 +409,7 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "multiple; general")]
 			public void multiple_general() {
 				// arrange
-				LogEntry sample = Sample;
+				LogData sample = Sample;
 				SingleEntryLogger logger1 = new SingleEntryLogger();
 				Debug.Assert(logger1.Logged == false);
 				SingleEntryLogger logger2 = new SingleEntryLogger();
@@ -421,14 +421,14 @@ namespace Zafu.Logging.Tests {
 				sample.LogTo(loggers);
 
 				// assert
-				Assert.Equal(sample, logger1.Entry);
-				Assert.Equal(sample, logger2.Entry);
+				Assert.Equal(sample, logger1.Data);
+				Assert.Equal(sample, logger2.Data);
 			}
 
 			[Fact(DisplayName = "multiple; loggers: null")]
 			public void multiple_loggers_null() {
 				// arrange
-				LogEntry sample = Sample;
+				LogData sample = Sample;
 				IEnumerable<ILogger> loggers = null!;
 
 				// act

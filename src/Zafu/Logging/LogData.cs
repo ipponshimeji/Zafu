@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
-using System.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Zafu.Logging {
-	public class LogEntry: Entry, IEquatable<LogEntry> {
+	/// <summary>
+	/// The class to represent data for ILogger.Log operation.
+	/// An instance of this class is immutable.
+	/// </summary>
+	public class LogData: LoggingData, IEquatable<LogData> {
 		#region data
 
 		protected static readonly MethodInfo GenericLogMethodInfo;
@@ -29,13 +32,13 @@ namespace Zafu.Logging {
 
 		#region creation
 
-		static LogEntry() {
+		static LogData() {
 			MethodInfo ? genericLogMethodInfo = typeof(ILogger).GetMethod("Log");
 			Debug.Assert(genericLogMethodInfo != null);
 			GenericLogMethodInfo = genericLogMethodInfo;
 		}
 
-		public LogEntry(Type stateType, LogLevel logLevel, EventId eventId, object? state, Exception? exception, Delegate? formatter): base() {
+		public LogData(Type stateType, LogLevel logLevel, EventId eventId, object? state, Exception? exception, Delegate? formatter): base() {
 			// check argument
 			if (stateType == null) {
 				throw new ArgumentNullException(nameof(stateType));
@@ -51,7 +54,7 @@ namespace Zafu.Logging {
 			this.Formatter = formatter;
 		}
 
-		public LogEntry(LogEntry src): base(src) {
+		public LogData(LogData src): base(src) {
 			// check argument
 			Debug.Assert(src != null);
 
@@ -69,7 +72,7 @@ namespace Zafu.Logging {
 
 		#region operators
 
-		public static bool operator == (LogEntry? x, LogEntry? y) {
+		public static bool operator == (LogData? x, LogData? y) {
 			if (object.ReferenceEquals(x, null)) {
 				return object.ReferenceEquals(y, null);
 			} else {
@@ -88,16 +91,16 @@ namespace Zafu.Logging {
 			}
 		}
 
-		public static bool operator !=(LogEntry? x, LogEntry? y) {
+		public static bool operator !=(LogData? x, LogData? y) {
 			return !(x == y);
 		}
 
 		#endregion
 
 
-		#region IEquatable<LogEntry>
+		#region IEquatable<LogData>
 
-		public bool Equals(LogEntry? other) {
+		public bool Equals(LogData? other) {
 			return (this == other);
 		}
 
@@ -127,6 +130,7 @@ namespace Zafu.Logging {
 				logMethod.Invoke(logger, args);
 			} catch {
 				// continue
+				// TODO: should throw exception like Microsoft.Extensions.Logging.Logger.Log() implementation?
 			}
 		}
 
@@ -145,6 +149,7 @@ namespace Zafu.Logging {
 						logMethod.Invoke(logger, args);
 					} catch {
 						// continue
+						// TODO: should throw exception like Microsoft.Extensions.Logging.Logger.Log() implementation?
 					}
 				}
 			}
@@ -166,7 +171,7 @@ namespace Zafu.Logging {
 		#region overrides
 
 		public override bool Equals(object? obj) {
-			return (this == obj as LogEntry);
+			return (this == obj as LogData);
 		}
 
 		public override int GetHashCode() {

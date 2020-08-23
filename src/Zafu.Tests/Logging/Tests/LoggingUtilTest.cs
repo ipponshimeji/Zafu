@@ -63,7 +63,7 @@ namespace Zafu.Logging.Tests {
 
 				// assert
 				string expectedState = LoggingUtil.FormatLogMessage(this.Header, this.Message);
-				LogEntry? actual = logger.Entry;
+				LogData? actual = logger.Data;
 				
 				Assert.NotNull(actual); // actually logged?
 				Debug.Assert(actual != null);
@@ -118,7 +118,7 @@ namespace Zafu.Logging.Tests {
 				CallTargetOmittingArguments(logger, "name", "content");
 
 				// assert
-				LogEntry? actual = logger.Entry;
+				LogData? actual = logger.Data;
 				Assert.NotNull(actual); // actually logged?
 				Debug.Assert(actual != null);
 				Assert.Equal(typeof(string), actual.StateType);

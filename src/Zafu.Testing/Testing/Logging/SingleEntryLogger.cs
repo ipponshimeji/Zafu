@@ -5,7 +5,7 @@ using Zafu.Logging;
 
 namespace Zafu.Testing.Logging {
 	/// <summary>
-	/// The logger which can store only one log entry.
+	/// The logger which can store only one log.
 	/// This object can be used to test logging output quickly. 
 	/// </summary>
 	/// <remarks>
@@ -14,7 +14,7 @@ namespace Zafu.Testing.Logging {
 	public class SingleEntryLogger: ILogger {
 		#region data
 
-		public LogEntry? Entry { get; protected set; } = null;
+		public LogData? Data { get; protected set; } = null;
 
 		public string? Message { get; protected set; } = null;
 
@@ -25,7 +25,7 @@ namespace Zafu.Testing.Logging {
 
 		public bool Logged {
 			get {
-				return this.Entry != null;
+				return this.Data != null;
 			}
 		}
 
@@ -44,12 +44,12 @@ namespace Zafu.Testing.Logging {
 
 		public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) {
 			// check state
-			if (this.Entry != null) {
-				throw new InvalidOperationException("This logger can log only one entry.");
+			if (this.Data != null) {
+				throw new InvalidOperationException("This logger has already accepted a log. It can accept only one log.");
 			}
 
 			// store the log entry
-			this.Entry = new LogEntry(typeof(TState), logLevel, eventId, state, exception, formatter);
+			this.Data = new LogData(typeof(TState), logLevel, eventId, state, exception, formatter);
 			this.Message = (formatter == null) ? null : formatter(state, exception);
 		}
 
@@ -60,7 +60,7 @@ namespace Zafu.Testing.Logging {
 
 		public void Clear() {
 			// clear its state
-			this.Entry = null;
+			this.Data = null;
 			this.Message = null;
 		}
 

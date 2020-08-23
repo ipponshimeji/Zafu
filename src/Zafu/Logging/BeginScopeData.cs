@@ -6,7 +6,7 @@ using System.Reflection;
 using Microsoft.Extensions.Logging;
 
 namespace Zafu.Logging {
-	public class BeginScopeEntry: Entry, IEquatable<BeginScopeEntry> {
+	public class BeginScopeData: LoggingData, IEquatable<BeginScopeData> {
 		#region data
 
 		protected static readonly MethodInfo GenericBeginScopeMethodInfo;
@@ -23,14 +23,14 @@ namespace Zafu.Logging {
 
 		#region creation
 
-		static BeginScopeEntry() {
+		static BeginScopeData() {
 			MethodInfo? genericBeginScopeMethodInfo = typeof(ILogger).GetMethod("BeginScope");
 			Debug.Assert(genericBeginScopeMethodInfo != null);
 			GenericBeginScopeMethodInfo = genericBeginScopeMethodInfo;
 		}
 
 
-		public BeginScopeEntry(Type stateType, object? state, object? scope): base() {
+		public BeginScopeData(Type stateType, object? state, object? scope): base() {
 			// check argument
 			if (stateType == null) {
 				throw new ArgumentNullException(nameof(stateType));
@@ -43,7 +43,7 @@ namespace Zafu.Logging {
 			this.Scope = scope;
 		}
 
-		public BeginScopeEntry(BeginScopeEntry src): base(src) {
+		public BeginScopeData(BeginScopeData src): base(src) {
 			// check argument
 			Debug.Assert(src != null);
 
@@ -58,7 +58,7 @@ namespace Zafu.Logging {
 
 		#region operators
 
-		public static bool operator ==(BeginScopeEntry? x, BeginScopeEntry? y) {
+		public static bool operator ==(BeginScopeData? x, BeginScopeData? y) {
 			if (object.ReferenceEquals(x, null)) {
 				return object.ReferenceEquals(y, null);
 			} else {
@@ -74,16 +74,16 @@ namespace Zafu.Logging {
 			}
 		}
 
-		public static bool operator !=(BeginScopeEntry? x, BeginScopeEntry? y) {
+		public static bool operator !=(BeginScopeData? x, BeginScopeData? y) {
 			return !(x == y);
 		}
 
 		#endregion
 
 
-		#region IEquatable<BeginScopeEntry>
+		#region IEquatable<BeginScopeData>
 
-		public bool Equals(BeginScopeEntry? other) {
+		public bool Equals(BeginScopeData? other) {
 			return (this == other);
 		}
 
@@ -106,6 +106,7 @@ namespace Zafu.Logging {
 				scope = beginScopeMethod.Invoke(logger, args) as IDisposable;
 			} catch {
 				// continue
+				// TODO: should throw exception like Microsoft.Extensions.Logging.Logger.BeginScope() implementation?
 			}
 
 			return scope;
@@ -127,6 +128,7 @@ namespace Zafu.Logging {
 						scope = beginScopeMethod.Invoke(logger, args) as IDisposable;
 					} catch {
 						// continue
+						// TODO: should throw exception like Microsoft.Extensions.Logging.Logger.BeginScope() implementation?
 					}
 				}
 				return scope;
@@ -149,7 +151,7 @@ namespace Zafu.Logging {
 		#region overrides
 
 		public override bool Equals(object? obj) {
-			return (this == obj as BeginScopeEntry);
+			return (this == obj as BeginScopeData);
 		}
 
 		public override int GetHashCode() {
