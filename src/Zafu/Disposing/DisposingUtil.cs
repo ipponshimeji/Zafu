@@ -33,7 +33,7 @@ namespace Zafu.Disposing {
 			DisposeInternal(disposable, logger, getLocation, NoIndex);
 		}
 
-		public static void DisposeIgnoringException(IEnumerable<IDisposable>? disposables, ILogger? logger = null, Func<string>? getLocation = null) {
+		public static void DisposeIgnoringException(IEnumerable<IDisposable?>? disposables, ILogger? logger = null, Func<string>? getLocation = null) {
 			// check argument
 			if (disposables == null) {
 				return;
@@ -44,7 +44,7 @@ namespace Zafu.Disposing {
 
 			// dispose the objects
 			int index = 0;
-			foreach (IDisposable disposable in disposables) {
+			foreach (IDisposable? disposable in disposables) {
 				if (disposable != null) {
 					DisposeInternal(disposable, logger, getLocation, index);
 				}

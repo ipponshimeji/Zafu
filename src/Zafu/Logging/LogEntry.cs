@@ -6,7 +6,7 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Zafu.Logging {
-	public class LogEntry: IEquatable<LogEntry> {
+	public class LogEntry: Entry, IEquatable<LogEntry> {
 		#region data
 
 		protected static readonly MethodInfo GenericLogMethodInfo;
@@ -24,44 +24,6 @@ namespace Zafu.Logging {
 
 		public readonly Delegate? Formatter;
 
-
-		private MethodInfo? logMethodInfoCache = null;
-
-		private object?[]? logArgumentsCache = null;
-
-		#endregion
-
-
-		#region properties
-
-		protected MethodInfo LogMethodInfo {
-			get {
-				MethodInfo? logMethodInfo = this.logMethodInfoCache;
-				if (logMethodInfo == null) {
-					// Rarely this.logMethodInfoCache may be set at the same time from multiple threads.
-					// But don't care because the setting values will be the same after all.
-					logMethodInfo = GenericLogMethodInfo.MakeGenericMethod(this.StateType);
-					Interlocked.Exchange(ref this.logMethodInfoCache, logMethodInfo);
-				}
-				return logMethodInfo;
-			}
-		}
-
-		protected object?[] LogArguments {
-			get {
-				object?[]? logArguments = this.logArgumentsCache;
-				if (logArguments == null) {
-					// Rarely this.logArgumentsCache may be set at the same time from multiple threads.
-					// But don't care because the setting values will be the same after all.
-					logArguments = new object?[] {
-						this.LogLevel, this.EventId, this.State, this.Exception, this.Formatter
-					};
-					Interlocked.Exchange(ref this.logArgumentsCache, logArguments);
-				}
-				return logArguments;
-			}
-		}
-
 		#endregion
 
 
@@ -73,12 +35,12 @@ namespace Zafu.Logging {
 			GenericLogMethodInfo = genericLogMethodInfo;
 		}
 
-		public LogEntry(Type stateType, LogLevel logLevel, EventId eventId, object? state, Exception? exception, Delegate? formatter) {
+		public LogEntry(Type stateType, LogLevel logLevel, EventId eventId, object? state, Exception? exception, Delegate? formatter): base() {
 			// check argument
 			if (stateType == null) {
 				throw new ArgumentNullException(nameof(stateType));
 			}
-			// other parameters are directly stored
+			// state, exception, and formatter can be null
 
 			// initialize members
 			this.StateType = stateType;
@@ -89,11 +51,9 @@ namespace Zafu.Logging {
 			this.Formatter = formatter;
 		}
 
-		public LogEntry(LogEntry src) {
+		public LogEntry(LogEntry src): base(src) {
 			// check argument
-			if (src == null) {
-				throw new ArgumentNullException(nameof(src));
-			}
+			Debug.Assert(src != null);
 
 			// initialize members
 			this.StateType = src.StateType;
@@ -119,10 +79,10 @@ namespace Zafu.Logging {
 					return (
 						x.LogLevel == y.LogLevel &&
 						x.EventId == y.EventId &&
+						x.StateType == y.StateType &&
 						x.State == y.State &&
 						x.Exception == y.Exception &&
-						x.Formatter == y.Formatter &&
-						x.StateType == y.StateType
+						x.Formatter == y.Formatter
 					);
 				}				
 			}
@@ -146,7 +106,7 @@ namespace Zafu.Logging {
 
 		#region methods
 
-		public string? GetMessage() {
+		public virtual string? GetMessage() {
 			if (this.Formatter == null) {
 				return null;
 			} else {
@@ -154,38 +114,50 @@ namespace Zafu.Logging {
 			}
 		}
 
-		public void LogTo(ILogger logger) {
+		public virtual void LogTo(ILogger logger) {
 			// check argument
 			if (logger == null) {
 				throw new ArgumentNullException(nameof(logger));
 			}
 
 			// call logger.Log<TState>()
+			MethodInfo logMethod = GetLogMethodInfo();
+			object?[] args = GetLogArguments();
 			try {
-				this.LogMethodInfo.Invoke(logger, this.LogArguments);
+				logMethod.Invoke(logger, args);
 			} catch {
 				// continue
 			}
 		}
 
-		public void LogTo(IEnumerable<ILogger> loggers) {
+		public virtual void LogTo(IEnumerable<ILogger?> loggers) {
 			// check argument
 			if (loggers == null) {
 				throw new ArgumentNullException(nameof(loggers));
 			}
 
 			// call logger.Log<TState>()
-			MethodInfo logMethodInfo = this.LogMethodInfo;
-			object?[] logArguments = this.LogArguments;
-			foreach (ILogger logger in loggers) {
+			MethodInfo logMethod = GetLogMethodInfo();
+			object?[] args = GetLogArguments();
+			foreach (ILogger? logger in loggers) {
 				if (logger != null) {
 					try {
-						logMethodInfo.Invoke(logger, logArguments);
+						logMethod.Invoke(logger, args);
 					} catch {
 						// continue
 					}
 				}
 			}
+		}
+
+		protected MethodInfo GetLogMethodInfo() {
+			return GenericLogMethodInfo.MakeGenericMethod(this.StateType);
+		}
+
+		protected object?[] GetLogArguments() {
+			return new object?[] {
+				this.LogLevel, this.EventId, this.State, this.Exception, this.Formatter
+			};
 		}
 
 		#endregion

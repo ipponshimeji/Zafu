@@ -3,48 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Zafu.Logging;
 
 
 namespace Zafu.Testing.Logging {
-	public class TestingLogger: ILogger, IReadOnlyList<TestingLogger.Entry> {
-		#region types
-
-		/// <remarks>
-		/// This object is immutable.
-		/// </remarks>
-		public class Entry {
-			#region data
-
-			public readonly LogLevel LogLevel;
-
-			public readonly EventId EventId;
-
-			public readonly string Message;
-
-			public readonly Exception? Exception;
-
-			#endregion
-
-
-			#region constructor
-
-			public Entry(LogLevel logLevel, EventId eventId, string message, Exception? exception) {
-				// check argument
-				Debug.Assert(message != null);
-
-				// initialize members
-				this.LogLevel = logLevel;
-				this.EventId = eventId;
-				this.Message = message;
-				this.Exception = exception;
-			}
-
-			#endregion
-		}
-
-		#endregion
-
-
+	public class TestingLogger: ILogger, IReadOnlyList<Entry> {
 		#region data
 
 		private readonly object instanceLocker = new object();
@@ -115,9 +78,7 @@ namespace Zafu.Testing.Logging {
 
 			lock (this.instanceLocker) {
 				if (this.logLevel <= logLevel) {
-					string message = formatter(state, exception);
-					Entry entry = new Entry(logLevel, eventId, message, exception);
-
+					Entry entry = new LogEntry(typeof(TState), logLevel, eventId, state, exception, formatter);
 					this.logs.Add(entry);
 				}
 			}
@@ -137,7 +98,9 @@ namespace Zafu.Testing.Logging {
 		#region methods
 
 		public void Clear() {
-			this.logs.Clear();
+			lock (this.instanceLocker) {
+				this.logs.Clear();
+			}
 		}
 
 		#endregion

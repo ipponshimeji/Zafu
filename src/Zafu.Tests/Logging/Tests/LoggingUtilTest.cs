@@ -55,16 +55,18 @@ namespace Zafu.Logging.Tests {
 
 			#region methods
 
-			public void AssertLog(LogLevel expectedLogLevel, object? expectedFormatter, SingleEntryLogger actual) {
+			public void AssertLog(LogLevel expectedLogLevel, object? expectedFormatter, SingleEntryLogger logger) {
 				// check argument
-				if (actual == null) {
-					throw new ArgumentNullException(nameof(actual));
+				if (logger == null) {
+					throw new ArgumentNullException(nameof(logger));
 				}
 
 				// assert
 				string expectedState = LoggingUtil.FormatLogMessage(this.Header, this.Message);
-
-				Assert.True(actual.Logged); // actually logged?
+				LogEntry? actual = logger.Entry;
+				
+				Assert.NotNull(actual); // actually logged?
+				Debug.Assert(actual != null);
 				Assert.Equal(typeof(string), actual.StateType);
 				Assert.Equal(expectedLogLevel, actual.LogLevel);
 				Assert.Equal(this.EventId, actual.EventId);
@@ -112,11 +114,13 @@ namespace Zafu.Logging.Tests {
 				// arrange
 
 				// act
-				SingleEntryLogger actual = new SingleEntryLogger();
-				CallTargetOmittingArguments(actual, "name", "content");
+				SingleEntryLogger logger = new SingleEntryLogger();
+				CallTargetOmittingArguments(logger, "name", "content");
 
 				// assert
-				Assert.True(actual.Logged); // actually logged?
+				LogEntry? actual = logger.Entry;
+				Assert.NotNull(actual); // actually logged?
+				Debug.Assert(actual != null);
 				Assert.Equal(typeof(string), actual.StateType);
 				Assert.Equal(this.LogLevel, actual.LogLevel);
 				// logged the default values?

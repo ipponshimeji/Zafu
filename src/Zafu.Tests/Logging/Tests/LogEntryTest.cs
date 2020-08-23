@@ -1,12 +1,41 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Zafu.Testing.Logging;
 
 namespace Zafu.Logging.Tests {
 	public class LogEntryTest {
+		#region types
+
+		// The derived class from LogEntry to expose GetLogMethodInfo() and GetLogArguments() as public.
+		class TestingLogEntry: LogEntry {
+			#region creation
+
+			public TestingLogEntry(LogEntry src) : base(src) {
+			}
+
+			#endregion
+
+
+			#region methods
+
+			public new MethodInfo GetLogMethodInfo() {
+				return base.GetLogMethodInfo();
+			}
+
+			public new object?[] GetLogArguments() {
+				return base.GetLogArguments();
+			}
+
+			#endregion
+		}
+
+		#endregion
+
+
 		#region samples
 
 		public static LogEntry Sample = new LogEntry(typeof(Version), LogLevel.Information, new EventId(51, "test"), new Version(1, 2), new ApplicationException(), (Func<Version?, Exception?, string>)VersionFormatter);
@@ -83,9 +112,8 @@ namespace Zafu.Logging.Tests {
 				Assert.Equal(src.Formatter, actual.Formatter);
 			}
 
-
 			[Fact(DisplayName = "copy constructor; src: null")]
-			public void Copy_stateType_null() {
+			public void Copy_src_null() {
 				// arrange
 				LogEntry src = null!;
 
@@ -105,6 +133,8 @@ namespace Zafu.Logging.Tests {
 		#region comparison
 
 		public class Comparison {
+			#region utilities
+
 			protected void Test(LogEntry? x, LogEntry? y, bool expected) {
 				// act (operators)
 				bool actual_equality = (x == y);
@@ -124,6 +154,11 @@ namespace Zafu.Logging.Tests {
 					Assert.Equal(expected, actual_objectEqual);
 				}
 			}
+
+			#endregion
+
+
+			#region tests
 
 			[Fact(DisplayName = "same; general")]
 			public void same_general() {
@@ -233,6 +268,8 @@ namespace Zafu.Logging.Tests {
 				// act & assert
 				Test(x, y, expected: false);
 			}
+
+			#endregion
 		}
 
 		#endregion
@@ -278,15 +315,21 @@ namespace Zafu.Logging.Tests {
 		#region GetMessage
 
 		public class GetMessage {
+			#region utilities
+
 			/// <summary>
 			/// Returns a LogEntry instance which is different from src only at Formatter.
 			/// </summary>
 			/// <param name="formatter"></param>
 			/// <returns></returns>
-			protected static LogEntry GetSample(LogEntry src, Delegate formatter) {
+			protected static LogEntry GetSample(LogEntry src, Delegate? formatter) {
 				return new LogEntry(src.StateType, src.LogLevel, src.EventId, src.State, src.Exception, formatter);
 			}
 
+			#endregion
+
+
+			#region tests
 
 			[Fact(DisplayName = "general")]
 			public void general() {
@@ -324,6 +367,8 @@ namespace Zafu.Logging.Tests {
 				// assert
 				Assert.Equal("OK?", actual);
 			}
+
+			#endregion
 		}
 
 		#endregion
@@ -336,20 +381,14 @@ namespace Zafu.Logging.Tests {
 			public void single_general() {
 				// arrange
 				LogEntry sample = Sample;
-				SingleEntryLogger actual = new SingleEntryLogger();
-				Debug.Assert(actual.Logged == false);
+				SingleEntryLogger logger = new SingleEntryLogger();
+				Debug.Assert(logger.Logged == false);
 
 				// act
-				sample.LogTo(actual);
+				sample.LogTo(logger);
 
 				// assert
-				Assert.True(actual.Logged);
-				Assert.Equal(sample.StateType, actual.StateType);
-				Assert.Equal(sample.LogLevel, actual.LogLevel);
-				Assert.Equal(sample.EventId, actual.EventId);
-				Assert.Equal(sample.State, actual.State);
-				Assert.Equal(sample.Exception, actual.Exception);
-				Assert.Equal(sample.Formatter, actual.Formatter);
+				Assert.Equal(sample, logger.Entry);
 			}
 
 			[Fact(DisplayName = "single; logger: null")]
@@ -371,32 +410,19 @@ namespace Zafu.Logging.Tests {
 			public void multiple_general() {
 				// arrange
 				LogEntry sample = Sample;
-				SingleEntryLogger actual1 = new SingleEntryLogger();
-				Debug.Assert(actual1.Logged == false);
-				SingleEntryLogger actual2 = new SingleEntryLogger();
-				Debug.Assert(actual2.Logged == false);
+				SingleEntryLogger logger1 = new SingleEntryLogger();
+				Debug.Assert(logger1.Logged == false);
+				SingleEntryLogger logger2 = new SingleEntryLogger();
+				Debug.Assert(logger2.Logged == false);
 				// Note that null logger should be skipped without any exceptioin.
-				ILogger[] loggers = new ILogger[] { actual1, null!, actual2 };
+				ILogger?[] loggers = new ILogger?[] { logger1, null, logger2 };
 
 				// act
 				sample.LogTo(loggers);
 
 				// assert
-				Assert.True(actual1.Logged);
-				Assert.Equal(sample.StateType, actual1.StateType);
-				Assert.Equal(sample.LogLevel, actual1.LogLevel);
-				Assert.Equal(sample.EventId, actual1.EventId);
-				Assert.Equal(sample.State, actual1.State);
-				Assert.Equal(sample.Exception, actual1.Exception);
-				Assert.Equal(sample.Formatter, actual1.Formatter);
-
-				Assert.True(actual2.Logged);
-				Assert.Equal(sample.StateType, actual2.StateType);
-				Assert.Equal(sample.LogLevel, actual2.LogLevel);
-				Assert.Equal(sample.EventId, actual2.EventId);
-				Assert.Equal(sample.State, actual2.State);
-				Assert.Equal(sample.Exception, actual2.Exception);
-				Assert.Equal(sample.Formatter, actual2.Formatter);
+				Assert.Equal(sample, logger1.Entry);
+				Assert.Equal(sample, logger2.Entry);
 			}
 
 			[Fact(DisplayName = "multiple; loggers: null")]
@@ -412,6 +438,50 @@ namespace Zafu.Logging.Tests {
 
 				// assert
 				Assert.Equal("loggers", actual.ParamName);
+			}
+		}
+
+		#endregion
+
+
+		#region GetLogMethodInfo
+
+		public class GetLogMethodInfo {
+			[Fact(DisplayName = "general")]
+			public void general() {
+				// arrange
+				// Use wrapper class (TestingLogEntry) to access protected methods of LogEntry. 
+				TestingLogEntry sample = new TestingLogEntry(Sample);
+
+				// act
+				MethodInfo actual = sample.GetLogMethodInfo();
+				string str = actual.ToString();
+
+				// assert
+				Assert.Equal("Void Log[Version](Microsoft.Extensions.Logging.LogLevel, Microsoft.Extensions.Logging.EventId, System.Version, System.Exception, System.Func`3[System.Version,System.Exception,System.String])", actual.ToString());
+			}
+		}
+
+		#endregion
+
+
+		#region GetLogArguments
+
+		public class GetLogArguments {
+			[Fact(DisplayName = "general")]
+			public void general() {
+				// arrange
+				// Use wrapper class (TestingLogEntry) to access protected methods of LogEntry. 
+				TestingLogEntry sample = new TestingLogEntry(Sample);
+				object? expected = new object?[] {
+					sample.LogLevel, sample.EventId, sample.State, sample.Exception, sample.Formatter
+				};
+
+				// act
+				object?[] actual = sample.GetLogArguments();
+
+				// assert
+				Assert.Equal(expected, actual);
 			}
 		}
 
