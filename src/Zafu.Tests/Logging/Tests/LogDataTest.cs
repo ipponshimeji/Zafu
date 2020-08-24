@@ -38,7 +38,7 @@ namespace Zafu.Logging.Tests {
 
 		#region samples
 
-		public static readonly LogData Sample = new LogData(typeof(Version), LogLevel.Information, new EventId(51, "test"), new Version(1, 2), new ApplicationException(), (Func<Version?, Exception?, string>)VersionFormatter);
+		public static readonly LogData Sample = new LogData(typeof(Version), LogLevel.Information, new EventId(51, "test"), new Version(1, 2), new NotImplementedException(), (Func<Version?, Exception?, string>)VersionFormatter);
 
 		private static string VersionFormatter(Version? state, Exception? exception) {
 			return (state != null) ? state.ToString() : string.Empty;

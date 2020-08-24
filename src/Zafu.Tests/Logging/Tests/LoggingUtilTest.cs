@@ -166,7 +166,7 @@ namespace Zafu.Logging.Tests {
 				new LogSample("name", "log content", null, default(EventId), "[name] log content"),
 				new LogSample(null, "log content", null, default(EventId), "log content"),
 				new LogSample("name", null, null, default(EventId), "[name] "),
-				new LogSample("name", "log content", new ApplicationException(), default(EventId), "[name] log content"),
+				new LogSample("name", "log content", new NotSupportedException(), default(EventId), "[name] log content"),
 				new LogSample("name", "log content", null, new EventId(32, "test event"), "[name] log content")
 			}.ToTestData();
 		}
@@ -275,7 +275,7 @@ namespace Zafu.Logging.Tests {
 			public void general() {
 				// arrange
 				string message = "error";
-				Exception exception = new ApplicationException("something wrong.");
+				Exception exception = new InvalidOperationException("something wrong.");
 
 				// act
 				string actual = LoggingUtil.FormatLog(message, exception);

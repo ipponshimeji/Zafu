@@ -50,7 +50,7 @@ namespace Zafu.Testing.Logging {
 
 		private List<LoggingData> logs = new List<LoggingData>();
 
-		private LogLevel loggingLevel = LogLevel.Debug;
+		private LogLevel loggingLevel = LogLevel.Trace;
 
 		#endregion
 

@@ -13,7 +13,7 @@ namespace Zafu.Logging {
 
 		#region data
 
-		private static readonly RedirectingLogger defaultLogger = new RedirectingLogger();
+		private static readonly RelayingLogger defaultLogger = new RelayingLogger();
 
 		#endregion
 
