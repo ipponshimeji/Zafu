@@ -11,7 +11,7 @@ namespace Zafu.Testing.Logging {
 	/// <remarks>
 	/// Any instance members of this type is not thread safe.
 	/// </remarks>
-	public class SingleEntryLogger: ILogger {
+	public class SingleLogLogger: ILogger {
 		#region data
 
 		public LogData? Data { get; protected set; } = null;

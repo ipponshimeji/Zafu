@@ -55,7 +55,7 @@ namespace Zafu.Logging.Tests {
 
 			#region methods
 
-			public void AssertLog(LogLevel expectedLogLevel, object? expectedFormatter, SingleEntryLogger logger) {
+			public void AssertLog(LogLevel expectedLogLevel, object? expectedFormatter, SingleLogLogger logger) {
 				// check argument
 				if (logger == null) {
 					throw new ArgumentNullException(nameof(logger));
@@ -75,7 +75,7 @@ namespace Zafu.Logging.Tests {
 				Assert.Equal(expectedFormatter, actual.Formatter);
 			}
 
-			public void AssertLog(LogLevel expectedLogLevel, SingleEntryLogger actualLog) {
+			public void AssertLog(LogLevel expectedLogLevel, SingleLogLogger actualLog) {
 				AssertLog(expectedLogLevel, (Func<string, Exception?, string>)LoggingUtil.FormatLog, actualLog);
 			}
 
@@ -102,7 +102,7 @@ namespace Zafu.Logging.Tests {
 				Debug.Assert(sample != null);
 
 				// act
-				SingleEntryLogger actualLog = new SingleEntryLogger();
+				SingleLogLogger actualLog = new SingleLogLogger();
 				CallTarget(actualLog, sample.Header, sample.Message, sample.Exception, sample.EventId);
 
 				// assert
@@ -114,7 +114,7 @@ namespace Zafu.Logging.Tests {
 				// arrange
 
 				// act
-				SingleEntryLogger logger = new SingleEntryLogger();
+				SingleLogLogger logger = new SingleLogLogger();
 				CallTargetOmittingArguments(logger, "name", "content");
 
 				// assert
