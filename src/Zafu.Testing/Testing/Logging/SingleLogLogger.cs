@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Zafu.Logging;
 
 namespace Zafu.Testing.Logging {
 	/// <summary>
@@ -39,6 +38,7 @@ namespace Zafu.Testing.Logging {
 		}
 
 		public bool IsEnabled(LogLevel logLevel) {
+			// A log of all level is logged.
 			return true;
 		}
 
@@ -48,8 +48,8 @@ namespace Zafu.Testing.Logging {
 				throw new InvalidOperationException("This logger has already accepted a log. It can accept only one log.");
 			}
 
-			// store the log entry
-			this.Data = new LogData(typeof(TState), logLevel, eventId, state, exception, formatter);
+			// store the log data
+			this.Data = LogData.Create<TState>(state, logLevel, eventId, exception, formatter);
 			this.Message = (formatter == null) ? null : formatter(state, exception);
 		}
 

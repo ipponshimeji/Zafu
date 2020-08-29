@@ -213,7 +213,7 @@ namespace Zafu.Testing.Logging.Tests {
 				// arrange
 				BeginScopeData x = Sample;
 				// different from x only at State
-				object differentValue = new Version(9, 5);
+				object differentValue = new Uri("https://different.example.org");
 				Debug.Assert(differentValue != x.State);
 				BeginScopeData y = new BeginScopeData(x.StateType, differentValue, x.Scope);
 

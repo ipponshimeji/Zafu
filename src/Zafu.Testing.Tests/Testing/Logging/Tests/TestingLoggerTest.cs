@@ -4,31 +4,21 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Microsoft.Extensions.Logging;
-using Zafu.Logging;
 using Xunit;
 
 namespace Zafu.Testing.Logging.Tests {
 	public class TestingLoggerTest {
 		#region samples
 
-		public static readonly LogData SampleLog1 = new LogData(typeof(Version), LogLevel.Information, new EventId(3), new Version(1, 2), null, (Func<Version?, Exception?, string>)VersionFormatter);
+		public static readonly LogData SampleLog1 = LogData.Create<Version>(new Version(1, 2), LogLevel.Information, new EventId(3));
 
-		public static readonly LogData SampleLog2 = new LogData(typeof(Uri), LogLevel.Critical, new EventId(51, "test"), new Uri("http://example.org/"), new InvalidOperationException(), (Func<Uri?, Exception?, string>)UriFormatter);
+		public static readonly LogData SampleLog2 = LogData.Create<Uri>(new Uri("http://example.org/"), LogLevel.Critical, new EventId(51, "test"), new InvalidOperationException());
 
-		public static readonly LogData SampleLog3 = new LogData(typeof(Version), LogLevel.Trace, new EventId(-2000), new Version(3, 4), null, (Func<Version?, Exception?, string>)VersionFormatter);
+		public static readonly LogData SampleLog3 = LogData.Create<Version>(new Version(3, 4), LogLevel.Trace, new EventId(-2000));
 
-		public static readonly BeginScopeData SampleBeginScope1 = new BeginScopeData(typeof(Version), new Version(7, 6, 5, 4), null);
+		public static readonly BeginScopeData SampleBeginScope1 = BeginScopeData.Create<Version>(new Version(7, 6, 5, 4), null);
 
-		public static readonly BeginScopeData SampleBeginScope2 = new BeginScopeData(typeof(Uri), new Uri("https://example.org"), null);
-
-
-		private static string VersionFormatter(Version? state, Exception? exception) {
-			return (state != null) ? state.ToString() : string.Empty;
-		}
-
-		private static string UriFormatter(Uri? state, Exception? exception) {
-			return (state != null) ? state.ToString() : string.Empty;
-		}
+		public static readonly BeginScopeData SampleBeginScope2 = BeginScopeData.Create<Uri>(new Uri("https://example.org/"), null);
 
 		#endregion
 
@@ -43,8 +33,6 @@ namespace Zafu.Testing.Logging.Tests {
 				throw new ArgumentException($"It does not match to {nameof(TState)}.", $"{nameof(data)}.{nameof(data.StateType)}");
 			}
 
-			// Do not use data.LogTo().
-			// In this test, we would rather test ILogger interface of the target directly.
 			TState state = (TState)data.State!;
 			Func<TState, Exception, string> formatter = (Func<TState, Exception, string>)data.Formatter!;
 			target.Log<TState>(data.LogLevel, data.EventId, state, data.Exception!, formatter);
@@ -58,8 +46,6 @@ namespace Zafu.Testing.Logging.Tests {
 				throw new ArgumentException($"It does not match to {nameof(TState)}.", $"{nameof(data)}.{nameof(data.StateType)}");
 			}
 
-			// Do not use data.BeginScopeOn().
-			// In this test, we would rather test ILogger interface of the target directly.
 			TState state = (TState)data.State!;
 			return target.BeginScope<TState>(state);
 		}
@@ -177,7 +163,7 @@ namespace Zafu.Testing.Logging.Tests {
 				// no logging
 
 				// assert
-				LoggingData[] expected = new LoggingData[0];
+				LoggingData[] expected = Array.Empty<LoggingData>();
 				AssertLogs(expected, target);
 			}
 
@@ -291,11 +277,8 @@ namespace Zafu.Testing.Logging.Tests {
 			[Fact(DisplayName = "general")]
 			public void general() {
 				// arrange
-				static string formatter(string state, Exception exception) {
-					return state;
-				}
 				static LogData createSample(LogLevel logLevel) {
-					return new LogData(typeof(string), logLevel, default(EventId), logLevel.ToString(), null, (Func<string, Exception, string>)formatter);
+					return LogData.Create<string>(logLevel.ToString(), logLevel);
 				}
 				LogData sampleT = createSample(LogLevel.Trace);
 				LogData sampleD = createSample(LogLevel.Debug);
