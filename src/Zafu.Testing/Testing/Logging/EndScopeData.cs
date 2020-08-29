@@ -3,18 +3,22 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using Zafu.Disposing;
 
-namespace Zafu.Logging {
+namespace Zafu.Testing.Logging {
+	/// <summary>
+	/// The class to represent data for end scope operation of a scope which is returned from ILogger.BeginScope().
+	/// An instance of this class is immutable.
+	/// </summary>
 	public class EndScopeData: LoggingData, IEquatable<EndScopeData> {
 		#region data
 
-		public readonly object? Scope;
+		public readonly IDisposable? Scope;
 
 		#endregion
 
 
 		#region creation
 
-		public EndScopeData(object? scope): base() {
+		public EndScopeData(IDisposable? scope): base() {
 			// check argument
 			// scope can be null
 
@@ -58,27 +62,6 @@ namespace Zafu.Logging {
 
 		public bool Equals(EndScopeData? other) {
 			return (this == other);
-		}
-
-		#endregion
-
-
-		#region methods
-
-		public virtual void EndScope(IDisposable scope) {
-			// check argument
-			// The 'scope' argument is not checked though it is not nullable formally.
-			// The null scope will be ignored.
-
-			DisposingUtil.DisposeIgnoringException(scope);
-		}
-
-		public virtual void EndScope(IEnumerable<IDisposable?> scopes) {
-			// check argument
-			// The 'scopes' argument is not checked though it is not nullable formally.
-			// The null scopes will be ignored.
-
-			DisposingUtil.DisposeIgnoringException(scopes);
 		}
 
 		#endregion

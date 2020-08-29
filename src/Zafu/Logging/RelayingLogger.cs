@@ -2,13 +2,11 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Zafu.Disposing;
 
 namespace Zafu.Logging {
-	public class RedirectingLogger: ILogger {
+	public class RelayingLogger: ILogger {
 		#region data
 
 		private readonly object instanceLocker = new object();
@@ -20,7 +18,7 @@ namespace Zafu.Logging {
 
 		#region creation
 
-		public RedirectingLogger() {
+		public RelayingLogger() {
 		}
 
 		#endregion
@@ -28,21 +26,21 @@ namespace Zafu.Logging {
 
 		#region ILogger
 
-		public IDisposable BeginScope<TState>(TState state) {
+		public virtual IDisposable BeginScope<TState>(TState state) {
 			lock (this.instanceLocker) {
-				return BeginScope<TState>(this.targetLoggers, state);
+				return BeginScopeNTS<TState>(this.targetLoggers, state);
 			}
 		}
 
-		public bool IsEnabled(LogLevel logLevel) {
+		public virtual bool IsEnabled(LogLevel logLevel) {
 			lock (this.instanceLocker) {
-				return IsEnabled(this.targetLoggers, logLevel);
+				return IsEnabledNTS(this.targetLoggers, logLevel);
 			}
 		}
 
-		public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) {
+		public virtual void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) {
 			lock (this.instanceLocker) {
-				Log<TState>(this.targetLoggers, logLevel, eventId, state, exception, formatter);
+				LogNTS<TState>(this.targetLoggers, logLevel, eventId, state, exception, formatter);
 			}
 		}
 
@@ -81,7 +79,7 @@ namespace Zafu.Logging {
 		/// <remarks>
 		/// This method is called in the scope of lock(this.instanceLocker).
 		/// </remarks>
-		protected virtual IDisposable BeginScope<TState>(IEnumerable<ILogger> loggers, TState state) {
+		protected virtual IDisposable BeginScopeNTS<TState>(IEnumerable<ILogger> loggers, TState state) {
 			// check arguments
 			Debug.Assert(loggers != null);
 
@@ -96,13 +94,13 @@ namespace Zafu.Logging {
 
 			// TODO: create NotNull extension?
 			IDisposable[] targetScopes = loggers.Select(l => beginScope(l, state)).Where(d => d != null).ToArray()!;
-			return new DisposableCollection(targetScopes, "Scope of the Default Logger", this);
+			return new DisposableCollection(targetScopes, $"scope of {nameof(RelayingLogger)}", this);
 		}
 
 		/// <remarks>
 		/// This method is called in the scope of lock(this.instanceLocker).
 		/// </remarks>
-		protected virtual bool IsEnabled(IEnumerable<ILogger> loggers, LogLevel logLevel) {
+		protected virtual bool IsEnabledNTS(IEnumerable<ILogger> loggers, LogLevel logLevel) {
 			// check arguments
 			Debug.Assert(loggers != null);
 
@@ -125,7 +123,7 @@ namespace Zafu.Logging {
 		/// <remarks>
 		/// This method is called in the scope of lock(this.instanceLocker).
 		/// </remarks>
-		protected virtual void Log<TState>(IEnumerable<ILogger> loggers, LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) {
+		protected virtual void LogNTS<TState>(IEnumerable<ILogger> loggers, LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) {
 			// check arguments
 			Debug.Assert(loggers != null);
 

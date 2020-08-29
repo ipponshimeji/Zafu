@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace Zafu.Logging {
+namespace Zafu.Testing.Logging {
 	/// <summary>
 	/// The base class for classes which represent logging operation.
 	/// </summary>

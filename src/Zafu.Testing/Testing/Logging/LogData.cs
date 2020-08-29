@@ -1,19 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
 using Microsoft.Extensions.Logging;
 
-namespace Zafu.Logging {
+namespace Zafu.Testing.Logging {
 	/// <summary>
-	/// The class to represent data for ILogger.Log operation.
+	/// The class to represent data for ILogger.Log() operation.
 	/// An instance of this class is immutable.
 	/// </summary>
 	public class LogData: LoggingData, IEquatable<LogData> {
 		#region data
-
-		protected static readonly MethodInfo GenericLogMethodInfo;
-
 
 		public readonly Type StateType;
 
@@ -32,18 +27,15 @@ namespace Zafu.Logging {
 
 		#region creation
 
-		static LogData() {
-			MethodInfo ? genericLogMethodInfo = typeof(ILogger).GetMethod("Log");
-			Debug.Assert(genericLogMethodInfo != null);
-			GenericLogMethodInfo = genericLogMethodInfo;
-		}
-
 		public LogData(Type stateType, LogLevel logLevel, EventId eventId, object? state, Exception? exception, Delegate? formatter): base() {
 			// check argument
 			if (stateType == null) {
 				throw new ArgumentNullException(nameof(stateType));
 			}
 			// state, exception, and formatter can be null
+			if (state != null && stateType.IsInstanceOfType(state) == false) {
+				throw new ArgumentException($"It is not an instance of {stateType.FullName}", nameof(state));
+			}
 
 			// initialize members
 			this.StateType = stateType;
@@ -65,6 +57,16 @@ namespace Zafu.Logging {
 			this.State = src.State;
 			this.Exception = src.Exception;
 			this.Formatter = src.Formatter;
+		}
+
+
+		public static LogData Create<TState>(TState state, LogLevel logLevel, EventId eventId = default(EventId), Exception? exception = null, Func<TState, Exception, string>? formatter = null) {
+			// check argument
+			if (formatter == null) {
+				formatter = DefaultFormatter<TState>;
+			}
+
+			return new LogData(typeof(TState), logLevel, eventId, state, exception, formatter);
 		}
 
 		#endregion
@@ -109,60 +111,18 @@ namespace Zafu.Logging {
 
 		#region methods
 
+		public static string DefaultFormatter<TState>(TState state, Exception? exception) {
+			string? message = (state == null) ? string.Empty : state.ToString();
+			return message ?? string.Empty;
+		}
+
+
 		public virtual string? GetMessage() {
 			if (this.Formatter == null) {
 				return null;
 			} else {
 				return this.Formatter.DynamicInvoke(this.State, this.Exception) as string;
 			}
-		}
-
-		public virtual void LogTo(ILogger logger) {
-			// check argument
-			if (logger == null) {
-				throw new ArgumentNullException(nameof(logger));
-			}
-
-			// call logger.Log<TState>()
-			MethodInfo logMethod = GetLogMethodInfo();
-			object?[] args = GetLogArguments();
-			try {
-				logMethod.Invoke(logger, args);
-			} catch {
-				// continue
-				// TODO: should throw exception like Microsoft.Extensions.Logging.Logger.Log() implementation?
-			}
-		}
-
-		public virtual void LogTo(IEnumerable<ILogger?> loggers) {
-			// check argument
-			if (loggers == null) {
-				throw new ArgumentNullException(nameof(loggers));
-			}
-
-			// call logger.Log<TState>()
-			MethodInfo logMethod = GetLogMethodInfo();
-			object?[] args = GetLogArguments();
-			foreach (ILogger? logger in loggers) {
-				if (logger != null) {
-					try {
-						logMethod.Invoke(logger, args);
-					} catch {
-						// continue
-						// TODO: should throw exception like Microsoft.Extensions.Logging.Logger.Log() implementation?
-					}
-				}
-			}
-		}
-
-		protected MethodInfo GetLogMethodInfo() {
-			return GenericLogMethodInfo.MakeGenericMethod(this.StateType);
-		}
-
-		protected object?[] GetLogArguments() {
-			return new object?[] {
-				this.LogLevel, this.EventId, this.State, this.Exception, this.Formatter
-			};
 		}
 
 		#endregion

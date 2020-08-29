@@ -4,49 +4,12 @@ using System.Diagnostics;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Xunit;
-using Zafu.Testing.Logging;
 
-namespace Zafu.Logging.Tests {
+namespace Zafu.Testing.Logging.Tests {
 	public class LogDataTest {
-		#region types
-
-		// The derived class from LogData to expose GetLogMethodInfo() and GetLogArguments() as public.
-		class TestingLogData: LogData {
-			#region creation
-
-			public TestingLogData(LogData src) : base(src) {
-			}
-
-			#endregion
-
-
-			#region methods
-
-			public new MethodInfo GetLogMethodInfo() {
-				return base.GetLogMethodInfo();
-			}
-
-			public new object?[] GetLogArguments() {
-				return base.GetLogArguments();
-			}
-
-			#endregion
-		}
-
-		#endregion
-
-
 		#region samples
 
-		public static readonly LogData Sample = new LogData(typeof(Version), LogLevel.Information, new EventId(51, "test"), new Version(1, 2), new NotImplementedException(), (Func<Version?, Exception?, string>)VersionFormatter);
-
-		private static string VersionFormatter(Version? state, Exception? exception) {
-			return (state != null) ? state.ToString() : string.Empty;
-		}
-
-		private static string UriFormatter(Uri? state, Exception? exception) {
-			return (state != null) ? state.ToString() : string.Empty;
-		}
+		public static readonly LogData Sample = LogData.Create<Version>(new Version(1, 2), LogLevel.Information, new EventId(51, "test"), new NotImplementedException());
 
 		#endregion
 
@@ -62,7 +25,7 @@ namespace Zafu.Logging.Tests {
 				EventId eventId = new EventId(123, "warning event");
 				object? state = new Uri("http://example.org/");
 				Exception? exception = new SystemException();
-				Delegate formatter = (Func<Uri?, Exception?, string>)UriFormatter;
+				Delegate formatter = (Func<Uri, Exception?, string>)LogData.DefaultFormatter<Uri>;
 
 				// act
 				LogData actual = new LogData(stateType, logLevel, eventId, state, exception, formatter);
@@ -84,7 +47,7 @@ namespace Zafu.Logging.Tests {
 				EventId eventId = new EventId(123, "warning event");
 				object? state = new Uri("http://example.org/");
 				Exception? exception = new SystemException();
-				Delegate formatter = (Func<Uri?, Exception?, string>)UriFormatter;
+				Delegate formatter = (Func<Uri, Exception?, string>)LogData.DefaultFormatter<Uri>;
 
 				// act
 				ArgumentNullException actual = Assert.Throws<ArgumentNullException>(() => {
@@ -93,6 +56,26 @@ namespace Zafu.Logging.Tests {
 
 				// assert
 				Assert.Equal("stateType", actual.ParamName);
+			}
+
+			[Fact(DisplayName = "general constructor; state: type mismatch")]
+			public void General_state_typeMismatch() {
+				// arrange
+				Type stateType = typeof(Uri);
+				LogLevel logLevel = LogLevel.Warning;
+				EventId eventId = new EventId(123, "warning event");
+				object? state = new Version(1, 2);
+				Exception? exception = new SystemException();
+				Delegate formatter = (Func<Uri, Exception?, string>)LogData.DefaultFormatter<Uri>;
+
+				// act
+				ArgumentException actual = Assert.Throws<ArgumentException>(() => {
+					new LogData(stateType, logLevel, eventId, state, exception, formatter);
+				});
+
+				// assert
+				Assert.Equal("state", actual.ParamName);
+				Assert.Equal("It is not an instance of System.Uri (Parameter 'state')", actual.Message);
 			}
 
 			[Fact(DisplayName = "copy constructor; general")]
@@ -125,6 +108,27 @@ namespace Zafu.Logging.Tests {
 				// assert
 				Assert.Equal("src", actual.ParamName);
 			}
+
+			[Fact(DisplayName = "Create")]
+			public void Create() {
+				// arrange
+				LogLevel logLevel = LogLevel.Warning;
+				EventId eventId = new EventId(123, "warning event");
+				Uri state = new Uri("http://example.org/");
+				Exception? exception = new SystemException();
+				Func<Uri, Exception, string> formatter = LogData.DefaultFormatter<Uri>;
+
+				// act
+				LogData actual = LogData.Create<Uri>(state, logLevel, eventId, exception, formatter);
+
+				// assert
+				Assert.Equal(typeof(Uri), actual.StateType);
+				Assert.Equal(logLevel, actual.LogLevel);
+				Assert.Equal(eventId, actual.EventId);
+				Assert.Equal(state, actual.State);
+				Assert.Equal(exception, actual.Exception);
+				Assert.Equal(formatter, actual.Formatter);
+			}
 		}
 
 		#endregion
@@ -136,20 +140,22 @@ namespace Zafu.Logging.Tests {
 			#region utilities
 
 			protected void Test(LogData? x, LogData? y, bool expected) {
-				// act (operators)
+				// test operators
+				// act
 				bool actual_equality = (x == y);
 				bool actual_inequality = (x != y);
 
-				// assert (operators)
+				// assert
 				Assert.Equal(expected, actual_equality);
 				Assert.Equal(!expected, actual_inequality);
 
+				// test Equals methods
 				if (object.ReferenceEquals(x, null) == false) {
-					// act (Equals methods)
+					// act
 					bool actual_equal = x.Equals(y);
 					bool actual_objectEqual = x.Equals((object?)y);
 
-					// assert (Equals methods)
+					// assert
 					Assert.Equal(expected, actual_equal);
 					Assert.Equal(expected, actual_objectEqual);
 				}
@@ -187,6 +193,7 @@ namespace Zafu.Logging.Tests {
 				// act & assert
 				// test (Sample == null), (Sample != null), Sample.Equals((LogEntry?)null), and Sample.Equals((object?)null)
 				Test(Sample, null, expected: false);
+
 				// test (null == Sample) and (null != Sample)
 				Test(null, Sample, expected: false);
 			}
@@ -196,7 +203,7 @@ namespace Zafu.Logging.Tests {
 				// arrange
 				LogData x = Sample;
 				// different from x only at StateType
-				Type differentValue = typeof(Uri);
+				Type differentValue = typeof(object);
 				Debug.Assert(differentValue != x.StateType);
 				LogData y = new LogData(differentValue, x.LogLevel, x.EventId, x.State, x.Exception, x.Formatter);
 
@@ -261,7 +268,7 @@ namespace Zafu.Logging.Tests {
 				// arrange
 				LogData x = Sample;
 				// different from x only at Formatter
-				Delegate differentValue = (Func<Uri?, Exception?, string>)UriFormatter;
+				Delegate differentValue = (Func<Version, Exception?, string>)((Version v, Exception? e) => "Hi!");
 				Debug.Assert(differentValue != x.Formatter);
 				LogData y = new LogData(x.StateType, x.LogLevel, x.EventId, x.State, x.Exception, differentValue);
 
@@ -383,120 +390,6 @@ namespace Zafu.Logging.Tests {
 			}
 
 			#endregion
-		}
-
-		#endregion
-
-
-		#region LogTo
-
-		public class LogTo {
-			[Fact(DisplayName = "single; general")]
-			public void single_general() {
-				// arrange
-				LogData sample = Sample;
-				SingleEntryLogger logger = new SingleEntryLogger();
-				Debug.Assert(logger.Logged == false);
-
-				// act
-				sample.LogTo(logger);
-
-				// assert
-				Assert.Equal(sample, logger.Data);
-			}
-
-			[Fact(DisplayName = "single; logger: null")]
-			public void single_logger_null() {
-				// arrange
-				LogData sample = Sample;
-				ILogger logger = null!;
-
-				// act
-				ArgumentNullException actual = Assert.Throws<ArgumentNullException>(() => {
-					sample.LogTo(logger);
-				});
-
-				// assert
-				Assert.Equal("logger", actual.ParamName);
-			}
-
-			[Fact(DisplayName = "multiple; general")]
-			public void multiple_general() {
-				// arrange
-				LogData sample = Sample;
-				SingleEntryLogger logger1 = new SingleEntryLogger();
-				Debug.Assert(logger1.Logged == false);
-				SingleEntryLogger logger2 = new SingleEntryLogger();
-				Debug.Assert(logger2.Logged == false);
-				// Note that null logger should be skipped without any exceptioin.
-				ILogger?[] loggers = new ILogger?[] { logger1, null, logger2 };
-
-				// act
-				sample.LogTo(loggers);
-
-				// assert
-				Assert.Equal(sample, logger1.Data);
-				Assert.Equal(sample, logger2.Data);
-			}
-
-			[Fact(DisplayName = "multiple; loggers: null")]
-			public void multiple_loggers_null() {
-				// arrange
-				LogData sample = Sample;
-				IEnumerable<ILogger> loggers = null!;
-
-				// act
-				ArgumentNullException actual = Assert.Throws<ArgumentNullException>(() => {
-					sample.LogTo(loggers);
-				});
-
-				// assert
-				Assert.Equal("loggers", actual.ParamName);
-			}
-		}
-
-		#endregion
-
-
-		#region GetLogMethodInfo
-
-		public class GetLogMethodInfo {
-			[Fact(DisplayName = "general")]
-			public void general() {
-				// arrange
-				// Use wrapper class (TestingLogData) to access protected methods of LogData. 
-				TestingLogData sample = new TestingLogData(Sample);
-
-				// act
-				MethodInfo actual = sample.GetLogMethodInfo();
-				string? str = actual.ToString();
-
-				// assert
-				Assert.Equal("Void Log[Version](Microsoft.Extensions.Logging.LogLevel, Microsoft.Extensions.Logging.EventId, System.Version, System.Exception, System.Func`3[System.Version,System.Exception,System.String])", actual.ToString());
-			}
-		}
-
-		#endregion
-
-
-		#region GetLogArguments
-
-		public class GetLogArguments {
-			[Fact(DisplayName = "general")]
-			public void general() {
-				// arrange
-				// Use wrapper class (TestingLogData) to access protected methods of LogData. 
-				TestingLogData sample = new TestingLogData(Sample);
-				object? expected = new object?[] {
-					sample.LogLevel, sample.EventId, sample.State, sample.Exception, sample.Formatter
-				};
-
-				// act
-				object?[] actual = sample.GetLogArguments();
-
-				// assert
-				Assert.Equal(expected, actual);
-			}
 		}
 
 		#endregion
