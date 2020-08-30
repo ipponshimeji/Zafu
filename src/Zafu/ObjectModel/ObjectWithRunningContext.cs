@@ -1,24 +1,62 @@
 ﻿using System;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Zafu.Logging;
 
 
 namespace Zafu.ObjectModel {
 	public class ObjectWithRunningContext {
+		#region types
+
+		public class Use {
+			public static readonly object Message = new object();
+
+			public static readonly object Logging = new object();
+		}
+
+		#endregion
+
+
 		#region data
 
 		protected readonly IRunningContext RunningContext;
 
-		public string? NameForLogging { get; protected set; } = null;
+		private string name;
+
+		private string? nameForLoggingCache = null;
 
 		#endregion
 
 
 		#region properties
 
-		protected ILogger Logger {
+		protected ILogger Logger => this.RunningContext.Logger;
+
+		public string Name {
 			get {
-				return this.RunningContext.Logger;
+				return this.name;
+			}
+			set {
+				// check argument
+				if (value == null) {
+					throw new ArgumentNullException(nameof(value));
+				}
+
+				this.name = value;
+			}
+		}
+
+		protected string NameForLogging {
+			get {
+				string? value = this.nameForLoggingCache;
+				if (value == null) {
+					// There is low possibility to set in parallel, 
+					// but it gives no actual harm.
+					value = GetName(Use.Logging);
+					Interlocked.Exchange(ref this.nameForLoggingCache, value);
+				}
+
+				return value;
 			}
 		}
 
@@ -27,21 +65,31 @@ namespace Zafu.ObjectModel {
 
 		#region creation
 
-		public ObjectWithRunningContext(IRunningContext? runningContext) {
+		public ObjectWithRunningContext(string? name = null, IRunningContext? runningContext = null) {
 			// check argument
+			if (name == null) {
+				name = (this.GetType().FullName ?? string.Empty);
+			}
 			if (runningContext == null) {
-				// TODO: set default context
-				throw new ArgumentNullException(nameof(runningContext));
+				runningContext = ZafuEnvironment.DefaultRunningContext;
 			}
 
 			// initialize member
 			this.RunningContext = runningContext;
+			this.name = name;
 		}
 
 		#endregion
 
 
 		#region methods
+
+		public string GetName(object use) {
+			string? name = GetNameFor(use);
+			// use name as the default name
+			return name ?? this.Name;
+		}
+
 
 		protected void LogDebug(string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			LoggingUtil.LogDebug(this.Logger, this.NameForLogging, message, exception, eventId);
@@ -65,6 +113,21 @@ namespace Zafu.ObjectModel {
 
 		protected void LogCritical(string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			LoggingUtil.LogCritical(this.Logger, this.NameForLogging, message, exception, eventId);
+		}
+
+		#endregion
+
+
+		#region overridables
+
+		protected virtual string? GetNameFor(object use) {
+			return null;
+		}
+
+		protected virtual void ClearNameCacheFor(object use) {
+			if (use == Use.Logging) {
+				Interlocked.Exchange(ref this.nameForLoggingCache, null);
+			}
 		}
 
 		#endregion

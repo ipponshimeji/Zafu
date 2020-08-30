@@ -4,23 +4,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Zafu.Logging {
 	public static class LoggingUtil {
-		#region constants
-
-		public const string LogCategoryName = "Zafu";
-
-		#endregion
-
-
-		#region data
-
-		private static readonly RelayingLogger defaultLogger = new RelayingLogger();
-
-		#endregion
-
-
 		#region properties
 
-		public static ILogger DefaultLogger => defaultLogger;
+		public static ILogger DefaultLogger => ZafuEnvironment.DefaultRunningContext.Logger;
 
 		public static ILogger NullLogger => Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
 
@@ -28,39 +14,6 @@ namespace Zafu.Logging {
 
 
 		#region methods
-
-		public static void AddToDefaultLogger(ILogger logger) {
-			// check argument
-			if (logger == null) {
-				throw new ArgumentNullException(nameof(logger));
-			}
-
-			// add the logger to the default logger
-			defaultLogger.AddTargetLogger(logger);
-		}
-
-		public static ILogger AddToDefaultLogger(ILoggerFactory loggerFactory) {
-			// check argument
-			if (loggerFactory == null) {
-				throw new ArgumentNullException(nameof(loggerFactory));
-			}
-
-			// create a logger and add it to the default logger
-			ILogger logger = loggerFactory.CreateLogger(LogCategoryName);
-			AddToDefaultLogger(logger);
-			return logger;
-		}
-
-		public static bool RemoveFromDefaultLogger(ILogger logger) {
-			// check argument
-			if (logger == null) {
-				throw new ArgumentNullException(nameof(logger));
-			}
-
-			// remove the logger from the default logger
-			return defaultLogger.RemoveTargetLogger(logger);
-		}
-
 
 		public static string FormatLogMessage(string? header, string? message) {
 			if (string.IsNullOrEmpty(header)) {

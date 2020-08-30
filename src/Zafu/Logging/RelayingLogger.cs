@@ -4,12 +4,20 @@ using System.Diagnostics;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Zafu.Disposing;
+using Zafu.ObjectModel;
 
 namespace Zafu.Logging {
-	public class RelayingLogger: ILogger {
-		#region data
+	public class RelayingLogger: LockableObject, ILogger {
+		#region types
 
-		private readonly object instanceLocker = new object();
+		public new class Use: LockableObject.Use {
+			public static readonly object Scope = new object();
+		}
+
+		#endregion
+
+
+		#region data
 
 		private List<ILogger> targetLoggers = new List<ILogger>();
 
@@ -18,7 +26,7 @@ namespace Zafu.Logging {
 
 		#region creation
 
-		public RelayingLogger() {
+		public RelayingLogger(string? name = null, IRunningContext? runningContext = null): base(null, name, runningContext) {
 		}
 
 		#endregion
@@ -27,19 +35,19 @@ namespace Zafu.Logging {
 		#region ILogger
 
 		public virtual IDisposable BeginScope<TState>(TState state) {
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				return BeginScopeNTS<TState>(this.targetLoggers, state);
 			}
 		}
 
 		public virtual bool IsEnabled(LogLevel logLevel) {
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				return IsEnabledNTS(this.targetLoggers, logLevel);
 			}
 		}
 
 		public virtual void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) {
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				LogNTS<TState>(this.targetLoggers, logLevel, eventId, state, exception, formatter);
 			}
 		}
@@ -55,7 +63,7 @@ namespace Zafu.Logging {
 				throw new ArgumentNullException(nameof(logger));
 			}
 
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				this.targetLoggers.Add(logger);
 			}
 		}
@@ -66,8 +74,21 @@ namespace Zafu.Logging {
 				throw new ArgumentNullException(nameof(logger));
 			}
 
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				return this.targetLoggers.Remove(logger);
+			}
+		}
+
+		#endregion
+
+
+		#region overrides
+
+		protected override string? GetNameFor(object use) {
+			if (use == Use.Scope) {
+				return $"scope of {GetName(Use.Message)}";
+			} else {
+				return base.GetNameFor(use);
 			}
 		}
 
@@ -77,7 +98,7 @@ namespace Zafu.Logging {
 		#region overridables
 
 		/// <remarks>
-		/// This method is called in the scope of lock(this.instanceLocker).
+		/// This method is called in the scope of lock(this.InstanceLocker).
 		/// </remarks>
 		protected virtual IDisposable BeginScopeNTS<TState>(IEnumerable<ILogger> loggers, TState state) {
 			// check arguments
@@ -92,13 +113,12 @@ namespace Zafu.Logging {
 				}
 			}
 
-			// TODO: create NotNull extension?
 			IDisposable[] targetScopes = loggers.Select(l => beginScope(l, state)).Where(d => d != null).ToArray()!;
-			return new DisposableCollection(targetScopes, $"scope of {nameof(RelayingLogger)}", this);
+			return new DisposableCollection(targetScopes, GetName(Use.Scope), this.RunningContext);
 		}
 
 		/// <remarks>
-		/// This method is called in the scope of lock(this.instanceLocker).
+		/// This method is called in the scope of lock(this.InstanceLocker).
 		/// </remarks>
 		protected virtual bool IsEnabledNTS(IEnumerable<ILogger> loggers, LogLevel logLevel) {
 			// check arguments
@@ -121,7 +141,7 @@ namespace Zafu.Logging {
 		}
 
 		/// <remarks>
-		/// This method is called in the scope of lock(this.instanceLocker).
+		/// This method is called in the scope of lock(this.InstanceLocker).
 		/// </remarks>
 		protected virtual void LogNTS<TState>(IEnumerable<ILogger> loggers, LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) {
 			// check arguments

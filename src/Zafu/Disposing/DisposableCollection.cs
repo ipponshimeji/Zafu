@@ -2,19 +2,12 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading;
-using Microsoft.Extensions.Logging;
+using Zafu.ObjectModel;
 
 namespace Zafu.Disposing {
 
-	public class DisposableCollection: IDisposable, ICollection<IDisposable> {
+	public class DisposableCollection: DisposableObject, ICollection<IDisposable> {
 		#region data
-
-		private readonly object instanceLocker = new object();
-
-		public readonly string? Name;
-
-		private readonly ILogger? logger;
 
 		private List<IDisposable>? disposables;
 
@@ -23,30 +16,27 @@ namespace Zafu.Disposing {
 
 		#region creation & disposal
 
-		private DisposableCollection(List<IDisposable> disposables, string? name, ILogger? logger) {
+		private DisposableCollection(List<IDisposable> disposables, string? name, IRunningContext? runningContext): base(null, name, runningContext) {
 			// check argument
 			Debug.Assert(disposables != null);
 
 			// initialize member
-			this.Name = name;
-			this.logger = logger;
 			this.disposables = disposables;
 		}
 
-		public DisposableCollection(IEnumerable<IDisposable> disposables, string? name = null, ILogger? logger = null) : this(new List<IDisposable>(disposables), name, logger) {
+		public DisposableCollection(IEnumerable<IDisposable> disposables, string? name, IRunningContext? runningContext = null) : this(new List<IDisposable>(disposables), name, runningContext) {
 		}
 
-		public DisposableCollection(int capacity, string? name = null, ILogger? logger = null): this(new List<IDisposable>(capacity), name, logger) {
+		public DisposableCollection(int capacity, string? name, IRunningContext? runningContext = null) : this(new List<IDisposable>(capacity), name, runningContext) {
 		}
 
-		public DisposableCollection(string? name = null, ILogger? logger = null): this(new List<IDisposable>(), name, logger) {
+		public DisposableCollection(string? name, IRunningContext? runningContext = null) : this(new List<IDisposable>(), name, runningContext) {
 		}
 
-		public void Dispose() {
-			List<IDisposable>? value = Interlocked.Exchange(ref this.disposables, null);
+		protected override void Dispose(bool disposing) {
+			List<IDisposable>? value = this.disposables;
 			if (value != null) {
-				Func<string>? getLocation = (this.Name == null) ? (Func<string>?)null : GetDisposeLocation;
-				DisposingUtil.DisposeIgnoringException(value, this.logger, getLocation);
+				DisposingUtil.DisposeLoggingException(value, this.RunningContext);
 			}
 		}
 
@@ -56,7 +46,7 @@ namespace Zafu.Disposing {
 		#region IEnumerable
 
 		IEnumerator IEnumerable.GetEnumerator() {
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				return EnsureNotDisposedNTS().GetEnumerator();
 			}
 		}
@@ -67,7 +57,7 @@ namespace Zafu.Disposing {
 		#region IEnumerable<IDisposable>
 
 		public IEnumerator<IDisposable> GetEnumerator() {
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				return EnsureNotDisposedNTS().GetEnumerator();
 			}
 		}
@@ -79,7 +69,7 @@ namespace Zafu.Disposing {
 
 		public int Count {
 			get {
-				lock (this.instanceLocker) {
+				lock (this.InstanceLocker) {
 					return EnsureNotDisposedNTS().Count;
 				}
 			}
@@ -93,31 +83,31 @@ namespace Zafu.Disposing {
 		public bool IsReadOnly => false;
 
 		public void Add(IDisposable item) {
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				EnsureNotDisposedNTS().Add(item);
 			}
 		}
 
 		public void Clear() {
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				EnsureNotDisposedNTS().Clear();
 			}
 		}
 
 		public bool Contains(IDisposable item) {
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				return EnsureNotDisposedNTS().Contains(item);
 			}
 		}
 
 		public void CopyTo(IDisposable[] array, int arrayIndex) {
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				EnsureNotDisposedNTS().CopyTo(array, arrayIndex);
 			}
 		}
 
 		public bool Remove(IDisposable item) {
-			lock (this.instanceLocker) {
+			lock (this.InstanceLocker) {
 				return EnsureNotDisposedNTS().Remove(item);
 			}
 		}
@@ -134,19 +124,10 @@ namespace Zafu.Disposing {
 			// check state
 			List<IDisposable>? disposables = this.disposables;
 			if (disposables == null) {
-				throw new ObjectDisposedException(this.Name);
+				throw CreateObjectDisposedException();
 			}
 
 			return disposables;
-		}
-
-		#endregion
-
-
-		#region privates
-
-		public string GetDisposeLocation() {
-			return $"{this.GetType().FullName}.Dispose() on '{this.Name}'";
 		}
 
 		#endregion

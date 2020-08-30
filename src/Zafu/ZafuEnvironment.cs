@@ -305,5 +305,43 @@ namespace Zafu {
 		}
 
 		#endregion
+
+
+		// TODO: add/remove logger to relayingLogger
+#if false
+
+		public static void AddToDefaultLogger(ILogger logger) {
+			// check argument
+			if (logger == null) {
+				throw new ArgumentNullException(nameof(logger));
+			}
+
+			// add the logger to the default logger
+			DefaultLogger.AddTargetLogger(logger);
+		}
+
+		public static ILogger AddToDefaultLogger(ILoggerFactory loggerFactory) {
+			// check argument
+			if (loggerFactory == null) {
+				throw new ArgumentNullException(nameof(loggerFactory));
+			}
+
+			// create a logger and add it to the default logger
+			ILogger logger = loggerFactory.CreateLogger(LogCategoryName);
+			AddToDefaultLogger(logger);
+			return logger;
+		}
+
+		public static bool RemoveFromDefaultLogger(ILogger logger) {
+			// check argument
+			if (logger == null) {
+				throw new ArgumentNullException(nameof(logger));
+			}
+
+			// remove the logger from the default logger
+			return defaultLogger.RemoveTargetLogger(logger);
+		}
+
+#endif
 	}
 }
