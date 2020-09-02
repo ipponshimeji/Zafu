@@ -14,6 +14,9 @@ namespace Zafu.ObjectModel {
 			public static readonly object Logging = new object();
 		}
 
+		public class LogPropertyNames: LoggingUtil.LogPropertyNames {
+		}
+
 		#endregion
 
 
@@ -92,27 +95,27 @@ namespace Zafu.ObjectModel {
 
 
 		protected void LogDebug(string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			LoggingUtil.LogDebug(this.Logger, this.NameForLogging, message, exception, eventId);
+			Log(LogLevel.Debug, message, exception, eventId);
 		}
 
 		protected void LogTrace(string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			LoggingUtil.LogTrace(this.Logger, this.NameForLogging, message, exception, eventId);
+			Log(LogLevel.Trace, message, exception, eventId);
 		}
 
 		protected void LogInformation(string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			LoggingUtil.LogInformation(this.Logger, this.NameForLogging, message, exception, eventId);
+			Log(LogLevel.Information, message, exception, eventId);
 		}
 
 		protected void LogWarning(string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			LoggingUtil.LogWarning(this.Logger, this.NameForLogging, message, exception, eventId);
+			Log(LogLevel.Warning, message, exception, eventId);
 		}
 
 		protected void LogError(string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			LoggingUtil.LogError(this.Logger, this.NameForLogging, message, exception, eventId);
+			Log(LogLevel.Error, message, exception, eventId);
 		}
 
 		protected void LogCritical(string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			LoggingUtil.LogCritical(this.Logger, this.NameForLogging, message, exception, eventId);
+			Log(LogLevel.Critical, message, exception, eventId);
 		}
 
 		#endregion
@@ -128,6 +131,10 @@ namespace Zafu.ObjectModel {
 			if (use == Use.Logging) {
 				Interlocked.Exchange(ref this.nameForLoggingCache, null);
 			}
+		}
+
+		protected virtual void Log(LogLevel logLevel, string? message, Exception? exception, EventId eventId) {
+			LoggingUtil.Log(this.Logger, logLevel, this.NameForLogging, message, exception, eventId);
 		}
 
 		#endregion

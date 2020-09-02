@@ -4,6 +4,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Zafu.Logging {
 	public static class LoggingUtil {
+		#region types
+
+		public class LogPropertyNames {
+			public const string Message = "message";
+			public const string Source = "source";
+		}
+
+		#endregion
+
+
 		#region properties
 
 		public static ILogger DefaultLogger => ZafuEnvironment.DefaultRunningContext.Logger;
@@ -15,33 +25,35 @@ namespace Zafu.Logging {
 
 		#region methods
 
-		public static string FormatLogMessage(string? header, string? message) {
-			if (string.IsNullOrEmpty(header)) {
-				return message ?? string.Empty;
-			} else {
-				return $"[{header}] {message}";
-			}
+		public static string GetSimpleState(string? source, string? message) {
+			// TODO: JSON escape
+			return $"{{\"{LogPropertyNames.Source}\": \"{source}\", \"{LogPropertyNames.Message}\": \"{message}\"}}";
 		}
 
 		/// <summary>
 		/// The default method which can be specified to 'formatter' argument of ILogger.Log().
 		/// </summary>
-		/// <param name="message"></param>
+		/// <param name="state"></param>
 		/// <param name="exception"></param>
 		/// <returns></returns>
-		public static string FormatLog(string message, Exception? exception) {
-			return message;
+		public static string DefaultFormatter<TState>(TState state, Exception? exception) {
+			if (state is null) {
+				return string.Empty;
+			} else {
+				return state.ToString() ?? string.Empty;
+			}
 		}
 
-		public static void Log(ILogger? logger, LogLevel logLevel, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+		public static void Log(ILogger? logger, LogLevel logLevel, string? source, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			// check argument
 			if (logger == null) {
 				// nothing to do
 				return;
 			}
 
+			// TODO: support structured logging
 			try {
-				logger.Log(logLevel, eventId, FormatLogMessage(header, message), exception, FormatLog);
+				logger.Log<string>(logLevel, eventId, GetSimpleState(source, message), exception, DefaultFormatter<string>);
 			} catch (Exception) {
 				// continue
 			}

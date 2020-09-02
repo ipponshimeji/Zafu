@@ -13,7 +13,7 @@ namespace Zafu.Logging.Tests {
 		public class LogSample {
 			#region data
 
-			public readonly string? Header;
+			public readonly string? Source;
 
 			public readonly string? Message;
 
@@ -28,9 +28,9 @@ namespace Zafu.Logging.Tests {
 
 			#region constructor
 
-			public LogSample(string? header, string? message, Exception? exception, EventId eventId, string? expectedMessage) {
+			public LogSample(string? source, string? message, Exception? exception, EventId eventId, string? expectedMessage) {
 				// initialize members
-				this.Header = header;
+				this.Source = source;
 				this.Message = message;
 				this.Exception = exception;
 				this.EventId = eventId;
@@ -43,11 +43,11 @@ namespace Zafu.Logging.Tests {
 			#region overrides
 
 			public override string ToString() {
-				string header = TestingUtil.GetDisplayText(this.Header, quote: true);
+				string source = TestingUtil.GetDisplayText(this.Source, quote: true);
 				string message = TestingUtil.GetDisplayText(this.Message, quote: true);
 				string exception = TestingUtil.GetNullOrNonNullText(this.Exception);
 
-				return $"{{header: {header}, message: {message}, exception: {exception}, eventId: {this.EventId}}}";
+				return $"{{source: {source}, message: {message}, exception: {exception}, eventId: {this.EventId}}}";
 			}
 
 			#endregion
@@ -62,7 +62,7 @@ namespace Zafu.Logging.Tests {
 				}
 
 				// assert
-				string expectedState = LoggingUtil.FormatLogMessage(this.Header, this.Message);
+				string expectedState = LoggingUtil.GetSimpleState(this.Source, this.Message);
 				LogData? actual = logger.Data;
 				
 				Assert.NotNull(actual); // actually logged?
@@ -76,7 +76,7 @@ namespace Zafu.Logging.Tests {
 			}
 
 			public void AssertLog(LogLevel expectedLogLevel, SingleLogLogger actualLog) {
-				AssertLog(expectedLogLevel, (Func<string, Exception?, string>)LoggingUtil.FormatLog, actualLog);
+				AssertLog(expectedLogLevel, (Func<string, Exception?, string>)LoggingUtil.DefaultFormatter<string>, actualLog);
 			}
 
 			#endregion
@@ -103,7 +103,7 @@ namespace Zafu.Logging.Tests {
 
 				// act
 				SingleLogLogger actualLog = new SingleLogLogger();
-				CallTarget(actualLog, sample.Header, sample.Message, sample.Exception, sample.EventId);
+				CallTarget(actualLog, sample.Source, sample.Message, sample.Exception, sample.EventId);
 
 				// assert
 				sample.AssertLog(this.LogLevel, actualLog);
@@ -148,9 +148,9 @@ namespace Zafu.Logging.Tests {
 
 			protected abstract LogLevel LogLevel { get; }
 
-			protected abstract void CallTarget(ILogger ?logger, string? header, string? message, Exception? exception, EventId eventId);
+			protected abstract void CallTarget(ILogger ?logger, string? source, string? message, Exception? exception, EventId eventId);
 
-			protected abstract void CallTargetOmittingArguments(ILogger? logger, string? header, string? message);
+			protected abstract void CallTargetOmittingArguments(ILogger? logger, string? source, string? message);
 
 			#endregion
 		}
@@ -162,12 +162,12 @@ namespace Zafu.Logging.Tests {
 
 		public static IEnumerable<object[]> GetLogSamples() {
 			return new LogSample[] {
-				//                  (header, message, exception, eventId, expectedMessage)
-				new LogSample("name", "log content", null, default(EventId), "[name] log content"),
-				new LogSample(null, "log content", null, default(EventId), "log content"),
-				new LogSample("name", null, null, default(EventId), "[name] "),
-				new LogSample("name", "log content", new NotSupportedException(), default(EventId), "[name] log content"),
-				new LogSample("name", "log content", null, new EventId(32, "test event"), "[name] log content")
+				//                  (source, message, exception, eventId, expectedMessage)
+				new LogSample("name", "log content", null, default(EventId), "{\"source\": \"name\", \"message\": \"log conent\"}"),
+				new LogSample(null, "log content", null, default(EventId), "{\"source\": \"\", \"message\": \"log conent\"}"),
+				new LogSample("name", null, null, default(EventId), "{\"source\": \"\", \"message\": \"\"}"),
+				new LogSample("name", "log content", new NotSupportedException(), default(EventId), "{\"source\": \"name\", \"message\": \"log conent\"}"),
+				new LogSample("name", "log content", null, new EventId(32, "test event"), "{\"source\": \"name\", \"message\": \"log conent\"}")
 			}.ToTestData();
 		}
 
@@ -181,15 +181,15 @@ namespace Zafu.Logging.Tests {
 		#endregion
 
 
-		#region FormatLogMessage
+		#region GetSimpleState
 
-		public class FormatLogMessage {
+		public class GetSimpleState {
 			#region types
 
 			public class LogMessageSample {
 				#region data
 
-				public readonly string? Header;
+				public readonly string? Source;
 
 				public readonly string? Message;
 
@@ -200,9 +200,9 @@ namespace Zafu.Logging.Tests {
 
 				#region constructor
 
-				public LogMessageSample(string? header, string? message, string? expectedMessage) {
+				public LogMessageSample(string? source, string? message, string? expectedMessage) {
 					// initialize members
-					this.Header = header;
+					this.Source = source;
 					this.Message = message;
 					this.ExpectedMessage = expectedMessage;
 				}
@@ -213,10 +213,10 @@ namespace Zafu.Logging.Tests {
 				#region overrides
 
 				public override string ToString() {
-					string header = TestingUtil.GetDisplayText(this.Header, quote: true);
+					string source = TestingUtil.GetDisplayText(this.Source, quote: true);
 					string message = TestingUtil.GetDisplayText(this.Message, quote: true);
 
-					return $"{{header: {header}, message: {message}}}";
+					return $"{{source: {source}, message: {message}}}";
 				}
 
 				#endregion
@@ -229,16 +229,16 @@ namespace Zafu.Logging.Tests {
 
 			public static IEnumerable<object[]> GetSamples() {
 				return new LogMessageSample[] {
-					//                  (header, message, expectedMessage)
-					new LogMessageSample("name", "log content", "[name] log content"),
-					new LogMessageSample("name", "", "[name] "),
-					new LogMessageSample("name", null, "[name] "),
-					new LogMessageSample("", "log content", "log content"),
-					new LogMessageSample("", "", ""),
-					new LogMessageSample("", null, ""),
-					new LogMessageSample(null, "log content", "log content"),
-					new LogMessageSample(null, "", ""),
-					new LogMessageSample(null, null, "")
+					//                  (source, message, expectedMessage)
+					new LogMessageSample("name", "log content", "{\"source\": \"name\", \"message\": \"log content\"}"),
+					new LogMessageSample("name", "", "{\"source\": \"name\", \"message\": \"\"}"),
+					new LogMessageSample("name", null, "{\"source\": \"name\", \"message\": \"\"}"),
+					new LogMessageSample("", "log content", "{\"source\": \"\", \"message\": \"log content\"}"),
+					new LogMessageSample("", "", "{\"source\": \"\", \"message\": \"\"}"),
+					new LogMessageSample("", null, "{\"source\": \"\", \"message\": \"\"}"),
+					new LogMessageSample(null, "log content", "{\"source\": \"\", \"message\": \"log content\"}"),
+					new LogMessageSample(null, "", "{\"source\": \"\", \"message\": \"\"}"),
+					new LogMessageSample(null, null, "{\"source\": \"\", \"message\": \"\"}")
 				}.ToTestData();
 			}
 
@@ -254,7 +254,7 @@ namespace Zafu.Logging.Tests {
 				Debug.Assert(sample != null);
 
 				// act
-				string actual = LoggingUtil.FormatLogMessage(sample.Header, sample.Message);
+				string actual = LoggingUtil.GetSimpleState(sample.Source, sample.Message);
 
 				// assert
 				Assert.Equal(sample.ExpectedMessage, actual);
@@ -278,7 +278,7 @@ namespace Zafu.Logging.Tests {
 				Exception exception = new InvalidOperationException("something wrong.");
 
 				// act
-				string actual = LoggingUtil.FormatLog(message, exception);
+				string actual = LoggingUtil.DefaultFormatter<string>(message, exception);
 
 				// assert
 				Assert.Equal(message, actual);
@@ -291,7 +291,7 @@ namespace Zafu.Logging.Tests {
 				Exception? exception = null;
 
 				// act
-				string actual = LoggingUtil.FormatLog(message, exception);
+				string actual = LoggingUtil.DefaultFormatter<string>(message, exception);
 
 				// assert
 				Assert.Equal(message, actual);
@@ -317,12 +317,12 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Trace;
 
-			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
-				LoggingUtil.LogTrace(logger, header, message, exception, eventId);
+			protected override void CallTarget(ILogger? logger, string? source, string? message, Exception? exception, EventId eventId) {
+				LoggingUtil.LogTrace(logger, source, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
-				LoggingUtil.LogTrace(logger, header, message);
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? source, string? message) {
+				LoggingUtil.LogTrace(logger, source, message);
 			}
 
 			#endregion
@@ -338,12 +338,12 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Debug;
 
-			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
-				LoggingUtil.LogDebug(logger, header, message, exception, eventId);
+			protected override void CallTarget(ILogger? logger, string? source, string? message, Exception? exception, EventId eventId) {
+				LoggingUtil.LogDebug(logger, source, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
-				LoggingUtil.LogDebug(logger, header, message);
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? source, string? message) {
+				LoggingUtil.LogDebug(logger, source, message);
 			}
 
 			#endregion
@@ -359,12 +359,12 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Information;
 
-			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
-				LoggingUtil.LogInformation(logger, header, message, exception, eventId);
+			protected override void CallTarget(ILogger? logger, string? source, string? message, Exception? exception, EventId eventId) {
+				LoggingUtil.LogInformation(logger, source, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
-				LoggingUtil.LogInformation(logger, header, message);
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? source, string? message) {
+				LoggingUtil.LogInformation(logger, source, message);
 			}
 
 			#endregion
@@ -380,12 +380,12 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Warning;
 
-			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
-				LoggingUtil.LogWarning(logger, header, message, exception, eventId);
+			protected override void CallTarget(ILogger? logger, string? source, string? message, Exception? exception, EventId eventId) {
+				LoggingUtil.LogWarning(logger, source, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
-				LoggingUtil.LogWarning(logger, header, message);
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? source, string? message) {
+				LoggingUtil.LogWarning(logger, source, message);
 			}
 
 			#endregion
@@ -401,12 +401,12 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Error;
 
-			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
-				LoggingUtil.LogError(logger, header, message, exception, eventId);
+			protected override void CallTarget(ILogger? logger, string? source, string? message, Exception? exception, EventId eventId) {
+				LoggingUtil.LogError(logger, source, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
-				LoggingUtil.LogError(logger, header, message);
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? source, string? message) {
+				LoggingUtil.LogError(logger, source, message);
 			}
 
 			#endregion
@@ -422,12 +422,12 @@ namespace Zafu.Logging.Tests {
 
 			protected override LogLevel LogLevel => LogLevel.Critical;
 
-			protected override void CallTarget(ILogger? logger, string? header, string? message, Exception? exception, EventId eventId) {
-				LoggingUtil.LogCritical(logger, header, message, exception, eventId);
+			protected override void CallTarget(ILogger? logger, string? source, string? message, Exception? exception, EventId eventId) {
+				LoggingUtil.LogCritical(logger, source, message, exception, eventId);
 			}
 
-			protected override void CallTargetOmittingArguments(ILogger? logger, string? header, string? message) {
-				LoggingUtil.LogCritical(logger, header, message);
+			protected override void CallTargetOmittingArguments(ILogger? logger, string? source, string? message) {
+				LoggingUtil.LogCritical(logger, source, message);
 			}
 
 			#endregion
