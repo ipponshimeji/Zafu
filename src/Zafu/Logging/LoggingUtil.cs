@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace Zafu.Logging {
@@ -25,13 +24,8 @@ namespace Zafu.Logging {
 
 		#region methods
 
-		public static string GetSimpleState(string? source, string? message) {
-			// TODO: JSON escape
-			return $"{{\"{LogPropertyNames.Source}\": \"{source}\", \"{LogPropertyNames.Message}\": \"{message}\"}}";
-		}
-
 		/// <summary>
-		/// The default method which can be specified to 'formatter' argument of ILogger.Log().
+		/// The default method which can be specified to 'formatter' argument of <see cref="ILogger.Log{TState}"/>.
 		/// </summary>
 		/// <param name="state"></param>
 		/// <param name="exception"></param>
@@ -44,6 +38,17 @@ namespace Zafu.Logging {
 			}
 		}
 
+		/// <summary>
+		/// The default method which can be specified to 'formatter' argument of <see cref="ILogger.Log{SimpleState}"/>.
+		/// </summary>
+		/// <param name="state"></param>
+		/// <param name="exception"></param>
+		/// <returns></returns>
+		public static string JsonFormatter(SimpleState state, Exception? exception) {
+			// format to JSON representation
+			return state.ToJson();
+		}
+
 		public static void Log(ILogger? logger, LogLevel logLevel, string? source, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			// check argument
 			if (logger == null) {
@@ -51,36 +56,35 @@ namespace Zafu.Logging {
 				return;
 			}
 
-			// TODO: support structured logging
 			try {
-				logger.Log<string>(logLevel, eventId, GetSimpleState(source, message), exception, DefaultFormatter<string>);
+				logger.Log<SimpleState>(logLevel, eventId, new SimpleState(source, message), exception, JsonFormatter);
 			} catch (Exception) {
 				// continue
 			}
 		}
 
-		public static void LogTrace(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			Log(logger, LogLevel.Trace, header, message, exception, eventId);
+		public static void LogTrace(ILogger? logger, string? source, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+			Log(logger, LogLevel.Trace, source, message, exception, eventId);
 		}
 
-		public static void LogDebug(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			Log(logger, LogLevel.Debug, header, message, exception, eventId);
+		public static void LogDebug(ILogger? logger, string? source, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+			Log(logger, LogLevel.Debug, source, message, exception, eventId);
 		}
 
-		public static void LogInformation(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			Log(logger, LogLevel.Information, header, message, exception, eventId);
+		public static void LogInformation(ILogger? logger, string? source, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+			Log(logger, LogLevel.Information, source, message, exception, eventId);
 		}
 
-		public static void LogWarning(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			Log(logger, LogLevel.Warning, header, message, exception, eventId);
+		public static void LogWarning(ILogger? logger, string? source, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+			Log(logger, LogLevel.Warning, source, message, exception, eventId);
 		}
 
-		public static void LogError(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			Log(logger, LogLevel.Error, header, message, exception, eventId);
+		public static void LogError(ILogger? logger, string? source, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+			Log(logger, LogLevel.Error, source, message, exception, eventId);
 		}
 
-		public static void LogCritical(ILogger? logger, string? header, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
-			Log(logger, LogLevel.Critical, header, message, exception, eventId);
+		public static void LogCritical(ILogger? logger, string? source, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
+			Log(logger, LogLevel.Critical, source, message, exception, eventId);
 		}
 
 		#endregion
