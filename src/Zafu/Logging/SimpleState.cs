@@ -155,8 +155,10 @@ namespace Zafu.Logging {
 
 			switch (format.ToUpperInvariant()) {
 				case "G":
+				case "g":
 					return ToString();
 				case "J":
+				case "j":
 					return ToJson();
 				default:
 					throw new FormatException($"The {format} format string is not supported.");

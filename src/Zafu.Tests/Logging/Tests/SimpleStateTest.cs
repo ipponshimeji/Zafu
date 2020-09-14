@@ -175,18 +175,22 @@ namespace Zafu.Logging.Tests {
 				// act
 				string actual_string = target.ToString();
 				string actual_format_G = target.ToString("G", formatProvider);
+				string actual_format_g = target.ToString("g", formatProvider);
 				string actual_format_null = target.ToString(null, formatProvider);
 				string actual_format_empty = target.ToString(string.Empty, formatProvider);
 				string actual_json = target.ToJson();
 				string actual_format_J = target.ToString("J", formatProvider);
+				string actual_format_j = target.ToString("j", formatProvider);
 
 				// assert
 				Assert.Equal(sample.Text, actual_string);
 				Assert.Equal(sample.Text, actual_format_G);
+				Assert.Equal(sample.Text, actual_format_g);
 				Assert.Equal(sample.Text, actual_format_null);
 				Assert.Equal(sample.Text, actual_format_empty);
 				Assert.Equal(sample.JsonText, actual_json);
 				Assert.Equal(sample.JsonText, actual_format_J);
+				Assert.Equal(sample.JsonText, actual_format_j);
 			}
 
 			[Fact(DisplayName = "format: invalid")]
