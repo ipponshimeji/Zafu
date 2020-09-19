@@ -61,26 +61,6 @@ namespace Zafu.Logging.Tests {
 		#endregion
 
 
-		#region constants
-
-		public class Constants {
-			#region tests
-
-			[Fact(DisplayName = "property names")]
-			public void PropertyName() {
-				// Property names should not contain any special character to be escaped.
-
-				// assert
-				Assert.False(JsonUtil.ContainsSpecialChar(SimpleState.MessagePropertyName));
-				Assert.False(JsonUtil.ContainsSpecialChar(SimpleState.SourcePropertyName));
-			}
-
-			#endregion
-		}
-
-		#endregion
-
-
 		#region IReadOnlyDictionary<string, object>
 
 		public class AsReadOnlyDictionary {

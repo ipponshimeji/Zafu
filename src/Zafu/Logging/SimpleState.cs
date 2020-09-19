@@ -170,22 +170,19 @@ namespace Zafu.Logging {
 
 		#region methods
 
-		public string ToJson() {
-			static void writePropertyHeader(TextWriter writer, string propName) {
-				// write $"\"{propName}\"":
-				writer.Write('"');
-				writer.Write(propName);
-				writer.Write("\": ");
+		public string ToJson(IJsonFormatter? formatter = null) {
+			// check argument
+			if (formatter == null) {
+				formatter = JsonUtil.LineFormatter;
 			}
 
+			// write the state as Json text
+			bool firstItem = true;
 			using (StringWriter writer = new StringWriter()) {
-				writer.Write("{ ");
-				writePropertyHeader(writer, SourcePropertyName);
-				JsonUtil.WriteJsonString(writer, this.Source);
-				writer.Write(", ");
-				writePropertyHeader(writer, MessagePropertyName);
-				JsonUtil.WriteJsonString(writer, this.Message);
-				writer.Write(" }");
+				formatter.WriteObjectStart(writer);
+				formatter.WriteStringObjectProperty(writer, SourcePropertyName, this.Source, ref firstItem);
+				formatter.WriteStringObjectProperty(writer, MessagePropertyName, this.Message, ref firstItem);
+				formatter.WriteObjectEnd(writer);
 
 				return writer.ToString();
 			}

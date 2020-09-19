@@ -14,175 +14,7 @@ namespace Zafu.Text {
 	/// So some simple implementations are provided here.
 	/// </remarks>
 	public static class JsonUtil {
-		#region types
-
-		/// <summary>
-		/// 
-		/// </summary>
-		/// <remarks>
-		/// Some methods of this interface are defined as generic methods.
-		/// For example, <c>WriteValue</c> method is not defined as <c>WriteValue(TextWriter, object?)</c> but <c>WriteValue<T>(TextWriter, T)</c>.
-		/// It is designed to prevent boxing for value type value.
-		/// Note that the first reason to provide this Json feature is for logging and
-		/// SimpleState, which is frequently processed as log contents in this library, is a value type. 
-		/// </remarks>
-		public interface IJsonFormatter {
-			void WriteNull(TextWriter writer);
-
-			void WriteBoolean(TextWriter writer, bool value);
-
-			void WriteNumber(TextWriter writer, double value);
-
-			void WriteString(TextWriter writer, string? value);
-
-			void WriteObject<T>(TextWriter writer, T value) where T : IEnumerable<KeyValuePair<string, object?>>;
-
-			void WriteArray<T>(TextWriter writer, T value) where T : IEnumerable<object?>;
-
-			void WriteValue<T>(TextWriter writer, T value);
-
-
-			void WriteObjectStart(TextWriter writer);
-
-			void WriteObjectEnd(TextWriter writer);
-
-			void WriteObjectProperty<T>(TextWriter writer, KeyValuePair<string, T> prop, ref bool firstItem);
-
-			void WriteArrayStart(TextWriter writer);
-
-			void WriteArrayEnd(TextWriter writer);
-
-			void WriteArrayItem<T>(TextWriter writer, T item, ref bool firstItem);
-		}
-
-		public class JsonFormatter: IJsonFormatter {
-			public virtual void WriteNull(TextWriter writer) {
-				JsonUtil.WriteJsonNull(writer);
-			}
-
-			public virtual void WriteBoolean(TextWriter writer, bool value) {
-				JsonUtil.WriteJsonBoolean(writer, value);
-			}
-
-			public virtual void WriteNumber(TextWriter writer, double value) {
-				JsonUtil.WriteJsonNumber(writer, value);
-			}
-
-			public virtual void WriteString(TextWriter writer, string? value) {
-				JsonUtil.WriteJsonString(writer, value);
-			}
-
-			public virtual void WriteObject<T>(TextWriter writer, T value) where T : IEnumerable<KeyValuePair<string, object?>> {
-				JsonUtil.WriteJsonObject<T>(writer, value, this);
-			}
-
-			public virtual void WriteArray<T>(TextWriter writer, T value) where T : IEnumerable<object?> {
-				JsonUtil.WriteJsonArray<T>(writer, value, this);
-			}
-
-			public virtual void WriteValue<T>(TextWriter writer, T value) {
-				JsonUtil.WriteJsonValue<T>(writer, value, this);
-			}
-
-
-			public virtual void WriteObjectStart(TextWriter writer) {
-				writer.Write('{');
-			}
-
-			public virtual void WriteObjectEnd(TextWriter writer) {
-				writer.Write('}');
-			}
-
-			public virtual void WriteObjectProperty<T>(TextWriter writer, KeyValuePair<string, T> prop, ref bool firstItem) {
-				if (firstItem) {
-					firstItem = false;
-				} else {
-					writer.Write(',');
-				}
-				WriteString(writer, prop.Key);
-				writer.Write(':');
-				WriteValue<T>(writer, prop.Value);
-			}
-
-			public virtual void WriteArrayStart(TextWriter writer) {
-				writer.Write('[');
-			}
-
-			public virtual void WriteArrayEnd(TextWriter writer) {
-				writer.Write(']');
-			}
-
-			public virtual void WriteArrayItem<T>(TextWriter writer, T item, ref bool firstItem) {
-				if (firstItem) {
-					firstItem = false;
-				} else {
-					writer.Write(',');
-				}
-				WriteValue<T>(writer, item);
-			}
-		}
-
-		public class CompactJsonFormatter: JsonFormatter {
-		}
-
-		public class LineJsonFormatter: JsonFormatter {
-			#region IJsonFormatter
-
-			public override void WriteObjectEnd(TextWriter writer) {
-				writer.Write(" }");
-			}
-
-			public override void WriteObjectProperty<T>(TextWriter writer, KeyValuePair<string, T> prop, ref bool firstItem) {
-				// check argument
-				if (writer == null) {
-					throw new ArgumentNullException(nameof(writer));
-				}
-
-				// write an object property
-				if (firstItem) {
-					firstItem = false;
-					writer.Write(' ');
-				} else {
-					writer.Write(", ");
-				}
-				WriteString(writer, prop.Key);
-				writer.Write(": ");
-				WriteValue<T>(writer, prop.Value);
-			}
-
-			public override void WriteArrayEnd(TextWriter writer) {
-				writer.Write(" ]");
-			}
-
-			public override void WriteArrayItem<T>(TextWriter writer, T item, ref bool firstItem) {
-				// check argument
-				if (writer == null) {
-					throw new ArgumentNullException(nameof(writer));
-				}
-
-				// write an array item
-				if (firstItem) {
-					firstItem = false;
-					writer.Write(' ');
-				} else {
-					writer.Write(", ");
-				}
-				WriteValue<T>(writer, item);
-			}
-
-			#endregion
-		}
-
-		// TODO: IndentJsonFormatter
-		// Unlike LineJsonFormatter or CompactJsonFormatter, IndentJsonFormatter will have state such as current indent level.
-		// That means user cannot use shared instance but has to create IndentJsonFormatter instance.
-
-		#endregion
-
-
 		#region constants
-
-		public const int DefaultIndentWidth = 2;
 
 		public const string JsonNull = "null";
 
@@ -195,9 +27,13 @@ namespace Zafu.Text {
 
 		#region data
 
-		public static readonly CompactJsonFormatter CompactFormatter = new CompactJsonFormatter();
+		public static readonly CompactJsonFormatter CompactFormatter = CompactJsonFormatter.Instance;
 
-		public static readonly LineJsonFormatter LineFormatter = new LineJsonFormatter();
+		public static readonly LineJsonFormatter LineFormatter = LineJsonFormatter.Instance;
+
+		// TODO: IndentJsonFormatter
+		// Unlike LineJsonFormatter or CompactJsonFormatter, IndentJsonFormatter will have state such as current indent level.
+		// That means user cannot use the shared instance but has to create IndentJsonFormatter instance.
 
 		#endregion
 
@@ -306,7 +142,7 @@ namespace Zafu.Text {
 			formatter.WriteObjectStart(writer);
 			bool firstItem = true;
 			foreach (KeyValuePair<string, object?> prop in value) {
-				formatter.WriteObjectProperty(writer, prop, ref firstItem);
+				formatter.WriteObjectProperty(writer, prop.Key, prop.Value, ref firstItem);
 			}
 			formatter.WriteObjectEnd(writer);
 		}
