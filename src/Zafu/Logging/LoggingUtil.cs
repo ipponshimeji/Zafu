@@ -49,6 +49,11 @@ namespace Zafu.Logging {
 			return state.ToJson();
 		}
 
+		public static string JsonFormatter<T>(SimpleState<T> state, Exception? exception) {
+			// format to JSON representation
+			return state.ToJson();
+		}
+
 		public static void Log(ILogger? logger, LogLevel logLevel, string? source, string? message, Exception? exception = null, EventId eventId = default(EventId)) {
 			// check argument
 			if (logger == null) {

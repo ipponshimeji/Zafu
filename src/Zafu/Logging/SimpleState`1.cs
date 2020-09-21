@@ -12,27 +12,22 @@ namespace Zafu.Logging {
 	/// </summary>
 	/// <remarks>
 	/// This structure is designed not to allocate object in text logging scenario,
-	/// while it can provide <see cref="IReadOnlyDictionary{string, object}"/> in structured logging scenario.
+	/// while it can provide <see cref="IReadOnlyDictionary{string, object?}"/> in structured logging scenario.
 	/// </remarks>
-	public struct SimpleState: IReadOnlyDictionary<string, object?>, IFormattable {
-		#region constants
-
-		public const string MessagePropertyName = "message";
-
-		public const string SourcePropertyName = "source";
-
-		#endregion
-
-
+	public struct SimpleState<T>: IReadOnlyDictionary<string, object?>, IFormattable {
 		#region data
 
-		// Note that the following members are not nullable in its use,
+		// Note that source, message, and extraPropName are not nullable in its use,
 		// but it is unavoidable to be null in the instance of default(SimpleState).
 		// So they are adjusted in their public getter (Source and Message properties).
 
 		private readonly string? source;
 
 		private readonly string? message;
+
+		private readonly string? extraPropName;
+
+		private readonly T extraPropValue;
 
 		#endregion
 
@@ -43,12 +38,16 @@ namespace Zafu.Logging {
 
 		public string Message => this.message ?? string.Empty;
 
+		public string ExtraPropertyName => this.extraPropName ?? string.Empty;
+
+		public T ExtraPropertyValue => this.extraPropValue;
+
 		#endregion
 
 
 		#region creation
 
-		public SimpleState(string? source, string? message) {
+		public SimpleState(string? source, string? message, string? extraPropName, T extraPropValue) {
 			// check arguments
 			if (source == null) {
 				source = string.Empty;
@@ -56,10 +55,15 @@ namespace Zafu.Logging {
 			if (message == null) {
 				message = string.Empty;
 			}
+			if (extraPropName == null) {
+				extraPropName = string.Empty;
+			}
 
 			// initialize members
 			this.message = message;
 			this.source = source;
+			this.extraPropName = extraPropName;
+			this.extraPropValue = extraPropValue;
 		}
 
 		#endregion
@@ -77,8 +81,9 @@ namespace Zafu.Logging {
 		#region IEnumerable<KeyValuePair<string, object?>>
 
 		public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() {
-			yield return new KeyValuePair<string, object?>(SourcePropertyName, this.Source);
-			yield return new KeyValuePair<string, object?>(MessagePropertyName, this.Message);
+			yield return new KeyValuePair<string, object?>(SimpleState.SourcePropertyName, this.Source);
+			yield return new KeyValuePair<string, object?>(this.ExtraPropertyName, this.ExtraPropertyValue);
+			yield return new KeyValuePair<string, object?>(SimpleState.MessagePropertyName, this.Message);
 		}
 
 		#endregion
@@ -88,7 +93,7 @@ namespace Zafu.Logging {
 
 		public int Count {
 			get {
-				return 2;
+				return 3;
 			}
 		}
 
@@ -97,7 +102,7 @@ namespace Zafu.Logging {
 
 		#region IReadOnlyDictionary<string, object?>
 
-		public object this[string key] {
+		public object? this[string key] {
 			get {
 				object? value;
 				if (TryGetValue(key, out value)) {
@@ -110,14 +115,16 @@ namespace Zafu.Logging {
 
 		public IEnumerable<string> Keys {
 			get {
-				yield return SourcePropertyName;
-				yield return MessagePropertyName;
+				yield return SimpleState.SourcePropertyName;
+				yield return this.ExtraPropertyName;
+				yield return SimpleState.MessagePropertyName;
 			}
 		}
 
-		public IEnumerable<object> Values {
+		public IEnumerable<object?> Values {
 			get{
 				yield return this.Source;
+				yield return this.ExtraPropertyValue;
 				yield return this.Message;
 			}
 		}
@@ -127,12 +134,12 @@ namespace Zafu.Logging {
 			return TryGetValue(key, out dummy);
 		}
 
-		public bool TryGetValue(string key, [MaybeNullWhen(false)] out object value) {
+		public bool TryGetValue(string key, [MaybeNullWhen(false)] out object? value) {
 			// try to get value
 			value = key switch {
-				SourcePropertyName => this.Source,
-				MessagePropertyName => this.Message,
-				_ => null
+				SimpleState.SourcePropertyName => this.Source,
+				SimpleState.MessagePropertyName => this.Message,
+				_ => (key == this.ExtraPropertyName)? (object?)this.ExtraPropertyValue: null,
 			};
 
 			return value != null;
@@ -176,8 +183,9 @@ namespace Zafu.Logging {
 			bool firstItem = true;
 			using (StringWriter writer = new StringWriter()) {
 				formatter.WriteObjectStart(writer);
-				formatter.WriteStringObjectProperty(writer, SourcePropertyName, this.Source, ref firstItem);
-				formatter.WriteStringObjectProperty(writer, MessagePropertyName, this.Message, ref firstItem);
+				formatter.WriteStringObjectProperty(writer, SimpleState.SourcePropertyName, this.Source, ref firstItem);
+				formatter.WriteObjectProperty<T>(writer, this.ExtraPropertyName, this.ExtraPropertyValue, ref firstItem);
+				formatter.WriteStringObjectProperty(writer, SimpleState.MessagePropertyName, this.Message, ref firstItem);
 				formatter.WriteObjectEnd(writer);
 
 				return writer.ToString();
@@ -200,9 +208,11 @@ namespace Zafu.Logging {
 
 			using (StringWriter writer = new StringWriter()) {
 				IJsonFormatter formatter = JsonUtil.LineFormatter;
-				writePropHeader(writer, SourcePropertyName, true);
+				writePropHeader(writer, SimpleState.SourcePropertyName, true);
 				formatter.WriteString(writer, this.Source);
-				writePropHeader(writer, MessagePropertyName, false);
+				writePropHeader(writer, this.ExtraPropertyName, false);
+				formatter.WriteValue<T>(writer, this.ExtraPropertyValue);
+				writePropHeader(writer, SimpleState.MessagePropertyName, false);
 				formatter.WriteString(writer, this.Message);
 
 				return writer.ToString();
@@ -210,16 +220,21 @@ namespace Zafu.Logging {
 		}
 
 		public override bool Equals(object? obj) {
-			if (obj is SimpleState) {
-				SimpleState that = (SimpleState)obj;
-				return (this.Source == that.Source) && (this.Message == that.Message);
+			if (obj is SimpleState<T>) {
+				SimpleState<T> that = (SimpleState<T>)obj;
+				return (
+					this.Source == that.Source &&
+					this.Message == that.Message &&
+					this.ExtraPropertyName == that.ExtraPropertyName &&
+					object.Equals(this.ExtraPropertyValue, that.ExtraPropertyValue)
+				);
 			} else {
 				return false;
 			}
 		}
 
 		public override int GetHashCode() {
-			return HashCode.Combine(this.Source, this.Message);
+			return HashCode.Combine(this.Source, this.Message, this.ExtraPropertyName, this.ExtraPropertyValue);
 		}
 
 		#endregion

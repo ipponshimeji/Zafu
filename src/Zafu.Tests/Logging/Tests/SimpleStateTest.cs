@@ -34,7 +34,11 @@ namespace Zafu.Logging.Tests {
 			#endregion
 		}
 
-		public static IEnumerable<object[]> GetSamples() {
+		public static SimpleState GetGeneralSampleValue() {
+			return new SimpleState("method1", "hello!");
+		}
+
+		public static IEnumerable<object[]> GetSampleData() {
 			return new Sample[] {
 				//  Sample(source, message, text, jsonText)
 				// general
@@ -43,13 +47,13 @@ namespace Zafu.Logging.Tests {
 					"source: \"method1\", message: \"hello!\"",
 					"{ \"source\": \"method1\", \"message\": \"hello!\" }"
 				),
-				// properties: empty
+				// property values: empty
 				new Sample(
 					"", "",
 					"source: \"\", message: \"\"",
 					"{ \"source\": \"\", \"message\": \"\" }"
 				),
-				// properties: contains special characters
+				// property values: contains special characters
 				new Sample(
 					"a\\b", "hello \"world!\"",
 					"source: \"a\\\\b\", message: \"hello \\\"world!\\\"\"",
@@ -61,13 +65,66 @@ namespace Zafu.Logging.Tests {
 		#endregion
 
 
+		#region constructor
+
+		public class Constructor {
+			#region tests
+
+			[Fact(DisplayName = "general")]
+			public void General() {
+				// arrange
+				string source = "method1";
+				string message = "hello!";
+
+				// act
+				SimpleState target = new SimpleState(source, message);
+
+				// assert
+				Assert.Equal(source, target.Source);
+				Assert.Equal(message, target.Message);
+			}
+
+			[Fact(DisplayName = "default")]
+			public void Default() {
+				// arrange
+
+				// act
+				SimpleState target = new SimpleState();
+
+				// assert
+				Assert.Equal(string.Empty, target.Source);
+				Assert.Equal(string.Empty, target.Message);
+			}
+
+			[Fact(DisplayName = "source: null, message: null")]
+			public void source_null_message_null() {
+				// null values should be converted to empty strings.
+	
+				// arrange
+				string? source = null;
+				string? message = null;
+
+				// act
+				SimpleState target = new SimpleState(source, message);
+
+				// assert
+				Assert.Equal(string.Empty, target.Source);
+				Assert.Equal(string.Empty, target.Message);
+			}
+
+			#endregion
+		}
+
+		#endregion
+
+
 		#region IReadOnlyDictionary<string, object>
 
 		public class AsReadOnlyDictionary {
 			#region samples
 
-			public static IEnumerable<object[]> GetSamples() {
-				return SimpleStateTest.GetSamples();
+			public static IEnumerable<object[]> GetSampleData() {
+				return SimpleStateTest.GetSampleData();
 			}
 
 			#endregion
@@ -76,13 +133,13 @@ namespace Zafu.Logging.Tests {
 			#region tests
 
 			[Theory(DisplayName = "general")]
-			[MemberData(nameof(GetSamples))]
+			[MemberData(nameof(GetSampleData))]
 			public void General(Sample sample) {
 				// arrange
 				SimpleState target = sample.Value;
-				KeyValuePair<string, object>[] expected = new KeyValuePair<string, object>[] {
-					new KeyValuePair<string, object>(SimpleState.SourcePropertyName, target.Source),
-					new KeyValuePair<string, object>(SimpleState.MessagePropertyName, target.Message)
+				KeyValuePair<string, object?>[] expected = new KeyValuePair<string, object?>[] {
+					new KeyValuePair<string, object?>(SimpleState.SourcePropertyName, target.Source),
+					new KeyValuePair<string, object?>(SimpleState.MessagePropertyName, target.Message)
 				};
 				const string invalidKey = "NotAKey";
 
@@ -92,37 +149,36 @@ namespace Zafu.Logging.Tests {
 				Assert.Equal(expected, (IEnumerable)target);
 
 				// as IEnumerable<KeyValuePair<string, object>>
-				Assert.Equal(expected, (IEnumerable<KeyValuePair<string, object>>)target);
+				Assert.Equal(expected, (IEnumerable<KeyValuePair<string, object?>>)target);
 
-				// as IReadOnlyCollection<KeyValuePair<string, object>>
+				// as IReadOnlyCollection<KeyValuePair<string, object?>>
 				Assert.Equal(2, target.Count);
 
-				// IReadOnlyDictionary<string, object>
+				// IReadOnlyDictionary<string, object?>
 				// item
 				Assert.Equal(target.Source, target[SimpleState.SourcePropertyName]);
 				Assert.Equal(target.Message, target[SimpleState.MessagePropertyName]);
 				Assert.Throws<KeyNotFoundException>(() => {
-					object dummy = target[invalidKey];
+					object? dummy = target[invalidKey];
 				});
 				// Keys
 				Assert.Equal(new string[] { SimpleState.SourcePropertyName, SimpleState.MessagePropertyName }, target.Keys);
 				// Values
-				Assert.Equal(new object[] { target.Source, target.Message }, target.Values);
+				Assert.Equal(new object?[] { target.Source, target.Message }, target.Values);
 				// Contains
 				Assert.True(target.ContainsKey(SimpleState.SourcePropertyName));
 				Assert.True(target.ContainsKey(SimpleState.MessagePropertyName));
 				Assert.False(target.ContainsKey(invalidKey));
 				// TryGetValue
-				object? value;
-				bool found = target.TryGetValue(SimpleState.SourcePropertyName, out value);
-				Assert.True(found);
-				Assert.Equal(target.Source, value);
-				found = target.TryGetValue(SimpleState.MessagePropertyName, out value);
-				Assert.True(found);
-				Assert.Equal(target.Message, value);
-				found = target.TryGetValue(invalidKey, out value);
-				Assert.False(found);
-				Assert.Null(value);
+				static void testTryGetValue(IReadOnlyDictionary<string, object?> t, string name, bool expectedResult, object? expectedValue) {
+					object? actualValue;
+					bool actualResult = t.TryGetValue(name, out actualValue);
+					Assert.Equal(expectedResult, actualResult);
+					Assert.Equal(expectedValue, actualValue);
+				}
+				testTryGetValue(target, SimpleState.SourcePropertyName, true, target.Source);
+				testTryGetValue(target, SimpleState.MessagePropertyName, true, target.Message);
+				testTryGetValue(target, invalidKey, false, null);
 			}
 
 			#endregion
@@ -136,8 +192,24 @@ namespace Zafu.Logging.Tests {
 		public class Stringizing {
 			#region samples
 
-			public static IEnumerable<object[]> GetSamples() {
-				return SimpleStateTest.GetSamples();
+			public static IEnumerable<object[]> GetSampleData() {
+				return SimpleStateTest.GetSampleData();
+			}
+
+			#endregion
+
+
+			#region utilities
+
+			protected void TestFormatter(SimpleState target, IJsonFormatter formatter) {
+				// arrange
+				string expected = JsonUtil.GetJsonObject<SimpleState>(target, formatter);
+
+				// act
+				string actual = target.ToJson(formatter);
+
+				// assert
+				Assert.Equal(expected, actual);
 			}
 
 			#endregion
@@ -146,7 +218,7 @@ namespace Zafu.Logging.Tests {
 			#region tests
 
 			[Theory(DisplayName = "general")]
-			[MemberData(nameof(GetSamples))]
+			[MemberData(nameof(GetSampleData))]
 			public void General(Sample sample) {
 				// arrange
 				SimpleState target = sample.Value;
@@ -189,13 +261,33 @@ namespace Zafu.Logging.Tests {
 				Assert.Equal("The invalid format string is not supported.", actual.Message);
 			}
 
+			[Fact(DisplayName = "formatter: CompactJsonFormatter")]
+			public void formatter_CompactJsonFormatter() {
+				// arrange
+				SimpleState target = GetGeneralSampleValue();
+				IJsonFormatter formatter = JsonUtil.CompactFormatter;
+
+				// act & assert
+				TestFormatter(target, formatter);
+			}
+
+			[Fact(DisplayName = "formatter: LineJsonFormatter")]
+			public void formatter_LineJsonFormatter() {
+				// arrange
+				SimpleState target = GetGeneralSampleValue();
+				IJsonFormatter formatter = JsonUtil.LineFormatter;
+
+				// act & assert
+				TestFormatter(target, formatter);
+			}
+
 			#endregion
 		}
 
 		#endregion
 
 
-		#region comparison
+		#region comparison (including GetHashCode())
 
 		public class Comparison {
 			#region tests
@@ -208,9 +300,12 @@ namespace Zafu.Logging.Tests {
 
 				// act
 				bool actual = x.Equals(y);
+				int hash_x = x.GetHashCode();
+				int hash_y = y.GetHashCode();
 
 				// assert
 				Assert.True(actual);
+				Assert.Equal(hash_x, hash_y);
 			}
 
 			[Fact(DisplayName = "same; empty")]
@@ -221,9 +316,12 @@ namespace Zafu.Logging.Tests {
 
 				// act
 				bool actual = x.Equals(y);
+				int hash_x = x.GetHashCode();
+				int hash_y = y.GetHashCode();
 
 				// assert
 				Assert.True(actual);
+				Assert.Equal(hash_x, hash_y);
 			}
 
 			[Fact(DisplayName = "different; Source")]
@@ -234,9 +332,12 @@ namespace Zafu.Logging.Tests {
 
 				// act
 				bool actual = x.Equals(y);
+				int hash_x = x.GetHashCode();
+				int hash_y = y.GetHashCode();
 
 				// assert
 				Assert.False(actual);
+				Assert.NotEqual(hash_x, hash_y);
 			}
 
 			[Fact(DisplayName = "different; Message")]
@@ -247,9 +348,12 @@ namespace Zafu.Logging.Tests {
 
 				// act
 				bool actual = x.Equals(y);
+				int hash_x = x.GetHashCode();
+				int hash_y = y.GetHashCode();
 
 				// assert
 				Assert.False(actual);
+				Assert.NotEqual(hash_x, hash_y);
 			}
 
 			[Fact(DisplayName = "different; type")]
@@ -279,42 +383,6 @@ namespace Zafu.Logging.Tests {
 			}
 
 			#endregion
-		}
-
-		#endregion
-
-
-		#region GetHashCode
-
-		public class HashCode {
-			[Fact(DisplayName = "same")]
-			public void same() {
-				// arrange
-				SimpleState x = new SimpleState("source", "message");
-				SimpleState y = new SimpleState("source", "message");
-				Debug.Assert(x.Equals(y));
-
-				// act
-				int actual_x = x.GetHashCode();
-				int actual_y = y.GetHashCode();
-
-				// assert
-				Assert.Equal(actual_x, actual_y);
-			}
-
-			[Fact(DisplayName = "different")]
-			public void different() {
-				// arrange
-				SimpleState x = new SimpleState("source", "message1");
-				SimpleState y = new SimpleState("source", "message2");
-
-				// act
-				int actual_x = x.GetHashCode();
-				int actual_y = y.GetHashCode();
-
-				// assert
-				Assert.NotEqual(actual_x, actual_y);
-			}
 		}
 
 		#endregion
