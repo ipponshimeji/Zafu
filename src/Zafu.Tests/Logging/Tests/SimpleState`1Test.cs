@@ -10,90 +10,104 @@ namespace Zafu.Logging.Tests {
 	public class SimpleStateTTest {
 		#region samples
 
-		public class Sample<T> {
-			#region data
-
-			public readonly SimpleState<T> Value;
-
-			public readonly string Text;
-
-			public readonly string JsonText;
-
-			#endregion
-
-
+		public class Sample<T>: SimpleStateTest.SampleBase<SimpleState<T>> {
 			#region constructor
 
-			public Sample(string? source, string? message, string? extraPropName, T extraPropValue, string text, string jsonText) {
-				// initialize members
-				this.Value = new SimpleState<T>(source, message, extraPropName, extraPropValue);
-				this.Text = text;
-				this.JsonText = jsonText;
+			public Sample(string description, SimpleState<T> value, string text, string jsonText): base(description, value, text, jsonText) {
+			}
+
+			public Sample(string description, string? source, string? message, string? extraPropName, T extraPropValue, string text, string jsonText):
+			base(description, new SimpleState<T>(source, message, extraPropName, extraPropValue), text, jsonText) {
 			}
 
 			#endregion
 		}
 
-		public static SimpleState<int> GetGeneralInt32SampleValue() {
-			return new SimpleState<int>("method1", "hello!", "index", 5);
+
+		public static SimpleState<int> GeneralInt32SampleValue => new SimpleState<int>("method1", "hello!", "index", 5);
+
+		public static IEnumerable<Sample<int>> GetInt32Samples() {
+			return new Sample<int>[] {
+				new Sample<int>(
+					description: "general",
+					source: "method1",
+					message: "hello!",
+					extraPropName: "index",
+					extraPropValue: 5,
+					text: "source: \"method1\", index: 5, message: \"hello!\"",
+					jsonText: "{ \"source\": \"method1\", \"index\": 5, \"message\": \"hello!\" }"
+				),
+				new Sample<int>(
+					description: "property values: contains special characters",
+					source: "a\\b",
+					message: "hello \"world!\"",
+					extraPropName: "index",
+					extraPropValue: -58,
+					text: "source: \"a\\\\b\", index: -58, message: \"hello \\\"world!\\\"\"",
+					jsonText: "{ \"source\": \"a\\\\b\", \"index\": -58, \"message\": \"hello \\\"world!\\\"\" }"
+				),
+				new Sample<int>(
+					description: "ExtraPropertyName: empty",
+					source: "",
+					message: "",
+					extraPropName: "",
+					extraPropValue: 0,
+					text: "source: \"\", : 0, message: \"\"",
+					jsonText: "{ \"source\": \"\", \"\": 0, \"message\": \"\" }"
+				),
+			};
 		}
 
 		public static IEnumerable<object[]> GetInt32SampleData() {
-			return new Sample<int>[] {
-				//  Sample(source, message, extraPropName, extraPropValue, text, jsonText)
-				// general
-				new Sample<int>(
-					"method1", "hello!", "index", 5,
-					"source: \"method1\", index: 5, message: \"hello!\"",
-					"{ \"source\": \"method1\", \"index\": 5, \"message\": \"hello!\" }"
-				),
-				// property values: contains special characters
-				new Sample<int>(
-					"a\\b", "hello \"world!\"", "index", -58,
-					"source: \"a\\\\b\", index: -58, message: \"hello \\\"world!\\\"\"",
-					"{ \"source\": \"a\\\\b\", \"index\": -58, \"message\": \"hello \\\"world!\\\"\" }"
-				),
-				// extra property name: empty
-				new Sample<int>(
-					"", "", "", 0,
-					"source: \"\", : 0, message: \"\"",
-					"{ \"source\": \"\", \"\": 0, \"message\": \"\" }"
-				),
-			}.ToTestData();
+			return GetInt32Samples().ToTestData();
 		}
 
-		public static SimpleState<string> GetGeneralStringSampleValue() {
-			return new SimpleState<string>("method1", "hello!", "description", "general");
+
+		public static SimpleState<string> GeneralStringSampleValue => new SimpleState<string>("method1", "hello!", "description", "general");
+
+		public static IEnumerable<Sample<string>> GetStringSamples() {
+			return new Sample<string>[] {
+				new Sample<string>(
+					description: "general",
+					source: "method1",
+					message: "hello!",
+					extraPropName: "description",
+					extraPropValue: "general",
+					text: "source: \"method1\", description: \"general\", message: \"hello!\"",
+					jsonText: "{ \"source\": \"method1\", \"description\": \"general\", \"message\": \"hello!\" }"
+				),
+				new Sample<string>(
+					description: "property values: empty",
+					source: "",
+					message: "",
+					extraPropName: "description",
+					extraPropValue: "",
+					text: "source: \"\", description: \"\", message: \"\"",
+					jsonText: "{ \"source\": \"\", \"description\": \"\", \"message\": \"\" }"
+				),
+				new Sample<string>(
+					description: "property values: contains special characters",
+					source: "a\\b",
+					message: "hello \"world!\"",
+					extraPropName: "description",
+					extraPropValue: "\0",
+					text: "source: \"a\\\\b\", description: \"\\u0000\", message: \"hello \\\"world!\\\"\"",
+					jsonText: "{ \"source\": \"a\\\\b\", \"description\": \"\\u0000\", \"message\": \"hello \\\"world!\\\"\" }"
+				),
+				new Sample<string>(
+					description: "ExtraPropertyName: empty",
+					source: "",
+					message: "",
+					extraPropName: "",
+					extraPropValue: "empty",
+					text: "source: \"\", : \"empty\", message: \"\"",
+					jsonText: "{ \"source\": \"\", \"\": \"empty\", \"message\": \"\" }"
+				),
+			};
 		}
 
 		public static IEnumerable<object[]> GetStringSampleData() {
-			return new Sample<string>[] {
-				//  Sample(source, message, extraPropName, extraPropValue, text, jsonText)
-				// general
-				new Sample<string>(
-					"method1", "hello!", "description", "general",
-					"source: \"method1\", description: \"general\", message: \"hello!\"",
-					"{ \"source\": \"method1\", \"description\": \"general\", \"message\": \"hello!\" }"
-				),
-				// property values: empty
-				new Sample<string>(
-					"", "", "description", "",
-					"source: \"\", description: \"\", message: \"\"",
-					"{ \"source\": \"\", \"description\": \"\", \"message\": \"\" }"
-				),
-				// property values: contains special characters
-				new Sample<string>(
-					"a\\b", "hello \"world!\"", "description", "\0",
-					"source: \"a\\\\b\", description: \"\\u0000\", message: \"hello \\\"world!\\\"\"",
-					"{ \"source\": \"a\\\\b\", \"description\": \"\\u0000\", \"message\": \"hello \\\"world!\\\"\" }"
-				),
-				// extra property name: empty
-				new Sample<string>(
-					"", "", "", "empty",
-					"source: \"\", : \"empty\", message: \"\"",
-					"{ \"source\": \"\", \"\": \"empty\", \"message\": \"\" }"
-				),
-			}.ToTestData();
+			return GetStringSamples().ToTestData();
 		}
 
 		#endregion
@@ -360,9 +374,7 @@ namespace Zafu.Logging.Tests {
 		public class Stringizing_Int32: StringizingBase<int> {
 			#region samples
 
-			public static SimpleState<int> GetGeneralSampleValue() {
-				return GetGeneralInt32SampleValue();
-			}
+			public static SimpleState<int> GeneralSampleValue => GeneralInt32SampleValue;
 
 			public static IEnumerable<object[]> GetSampleData() {
 				return SimpleStateTTest.GetInt32SampleData();
@@ -382,7 +394,7 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "formatter: CompactJsonFormatter")]
 			public void formatter_CompactJsonFormatter() {
 				// arrange
-				SimpleState<int> target = GetGeneralSampleValue();
+				SimpleState<int> target = GeneralSampleValue;
 				IJsonFormatter formatter = JsonUtil.CompactFormatter;
 
 				// act & assert
@@ -392,7 +404,7 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "formatter: LineJsonFormatter")]
 			public void formatter_LineJsonFormatter() {
 				// arrange
-				SimpleState<int> target = GetGeneralSampleValue();
+				SimpleState<int> target = GeneralSampleValue;
 				IJsonFormatter formatter = JsonUtil.LineFormatter;
 
 				// act & assert
@@ -405,9 +417,7 @@ namespace Zafu.Logging.Tests {
 		public class Stringizing_String: StringizingBase<string> {
 			#region samples
 
-			public static SimpleState<string> GetGeneralSampleValue() {
-				return GetGeneralStringSampleValue();
-			}
+			public static SimpleState<string> GeneralSampleValue => GeneralStringSampleValue;
 
 			public static IEnumerable<object[]> GetSampleData() {
 				return SimpleStateTTest.GetStringSampleData();
@@ -427,7 +437,7 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "formatter: CompactJsonFormatter")]
 			public void formatter_CompactJsonFormatter() {
 				// arrange
-				SimpleState<string> target = GetGeneralSampleValue();
+				SimpleState<string> target = GeneralSampleValue;
 				IJsonFormatter formatter = JsonUtil.CompactFormatter;
 
 				// act & assert
@@ -437,7 +447,7 @@ namespace Zafu.Logging.Tests {
 			[Fact(DisplayName = "formatter: LineJsonFormatter")]
 			public void formatter_LineJsonFormatter() {
 				// arrange
-				SimpleState<string> target = GetGeneralSampleValue();
+				SimpleState<string> target = GeneralSampleValue;
 				IJsonFormatter formatter = JsonUtil.LineFormatter;
 
 				// act & assert

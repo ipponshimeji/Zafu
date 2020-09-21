@@ -14,9 +14,6 @@ namespace Zafu.ObjectModel {
 			public static readonly object Logging = new object();
 		}
 
-		public class LogPropertyNames: LoggingUtil.LogPropertyNames {
-		}
-
 		#endregion
 
 
