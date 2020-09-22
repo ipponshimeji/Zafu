@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Zafu.Logging;
 
 namespace Zafu.Testing.Logging {
 	/// <summary>
@@ -60,13 +61,27 @@ namespace Zafu.Testing.Logging {
 		}
 
 
-		public static LogData Create<TState>(TState state, LogLevel logLevel, EventId eventId = default(EventId), Exception? exception = null, Func<TState, Exception, string>? formatter = null) {
+		public static LogData Create<TState>(TState state, LogLevel logLevel, Exception? exception = null, EventId eventId = default(EventId), Func<TState, Exception, string>? formatter = null) {
 			// check argument
 			if (formatter == null) {
-				formatter = DefaultFormatter<TState>;
+				formatter = LoggingUtil.DefaultFormatter<TState>;
 			}
 
 			return new LogData(typeof(TState), logLevel, eventId, state, exception, formatter);
+		}
+
+		public static LogData CreateWithSimpleState(string? source, string? message, LogLevel logLevel, Exception? exception = null, EventId eventId = default(EventId)) {
+			return Create<SimpleState>(new SimpleState(source, message), logLevel, exception, eventId, LoggingUtil.JsonFormatter);
+		}
+
+		public static LogData CreateWithSimpleState<T>(string? source, string? message, string extraPropName, T extraPropValue, LogLevel logLevel, Exception? exception = null, EventId eventId = default(EventId)) {
+			return Create<SimpleState<T>>(
+				new SimpleState<T>(source, message, extraPropName, extraPropValue),
+				logLevel,
+				exception,
+				eventId,
+				LoggingUtil.JsonFormatter
+			);
 		}
 
 		#endregion
@@ -110,12 +125,6 @@ namespace Zafu.Testing.Logging {
 
 
 		#region methods
-
-		public static string DefaultFormatter<TState>(TState state, Exception? exception) {
-			string? message = (state == null) ? string.Empty : state.ToString();
-			return message ?? string.Empty;
-		}
-
 
 		public virtual string? GetMessage() {
 			if (this.Formatter == null) {

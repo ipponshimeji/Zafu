@@ -143,6 +143,12 @@ namespace Zafu.Testing.Logging {
 			}
 		}
 
+		public LogData GetLogData(int index) {
+			// An ArgumentOutOfRangeException will be thrown if the index is out of range.
+			// An InvalidCastException will be thrown if the data is not LogData but BeginScopeData or EndScopeData.
+			return (LogData)this[index];
+		}
+
 		#endregion
 
 

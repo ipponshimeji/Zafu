@@ -10,11 +10,11 @@ namespace Zafu.Testing.Logging.Tests {
 	public class TestingLoggerTest {
 		#region samples
 
-		public static readonly LogData SampleLog1 = LogData.Create<Version>(new Version(1, 2), LogLevel.Information, new EventId(3));
+		public static readonly LogData SampleLog1 = LogData.Create<Version>(new Version(1, 2), LogLevel.Information, eventId: new EventId(3));
 
-		public static readonly LogData SampleLog2 = LogData.Create<Uri>(new Uri("http://example.org/"), LogLevel.Critical, new EventId(51, "test"), new InvalidOperationException());
+		public static readonly LogData SampleLog2 = LogData.Create<Uri>(new Uri("http://example.org/"), LogLevel.Critical, new InvalidOperationException(), new EventId(51, "test"));
 
-		public static readonly LogData SampleLog3 = LogData.Create<Version>(new Version(3, 4), LogLevel.Trace, new EventId(-2000));
+		public static readonly LogData SampleLog3 = LogData.Create<Version>(new Version(3, 4), LogLevel.Trace, eventId: new EventId(-2000));
 
 		public static readonly BeginScopeData SampleBeginScope1 = BeginScopeData.Create<Version>(new Version(7, 6, 5, 4), null);
 
@@ -333,6 +333,50 @@ namespace Zafu.Testing.Logging.Tests {
 				// assert
 				// The contents of the target should be cleared.
 				Assert.Empty(target);
+			}
+
+			#endregion
+		}
+
+		#endregion
+
+
+		#region GetLogData
+
+		public class GetLogData {
+			#region tests
+
+			[Fact(DisplayName = "general")]
+			public void general() {
+				// arrange
+				LogData sampleLog = SampleLog1;
+				BeginScopeData sampleScope = SampleBeginScope1;
+
+				TestingLogger target = new TestingLogger();
+				Log<Version>(target, sampleLog);
+				IDisposable scope = BeginScope<Version>(target, sampleScope);
+				scope.Dispose();
+
+				Debug.Assert(target.Count == 3);
+				Debug.Assert(target[0] is LogData);
+				Debug.Assert(target[1] is BeginScopeData);
+				Debug.Assert(target[2] is EndScopeData);
+
+				// act
+				LogData actual_log = target.GetLogData(0);
+				Assert.Throws<InvalidCastException>(() => {
+					target.GetLogData(1);
+				});
+				Assert.Throws<InvalidCastException>(() => {
+					target.GetLogData(2);
+				});
+				ArgumentOutOfRangeException actual_exception = Assert.Throws<ArgumentOutOfRangeException>(() => {
+					target.GetLogData(3);
+				});
+
+				// assert
+				Assert.Equal(sampleLog, actual_log);
+				Assert.Equal("index", actual_exception.ParamName);
 			}
 
 			#endregion

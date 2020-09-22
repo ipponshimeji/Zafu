@@ -71,7 +71,7 @@ namespace Zafu.Testing.Logging.Tests {
 		#endregion
 
 
-		#region comparison
+		#region comparison (including GetHashCode)
 
 		public class Comparison {
 			#region utilities
@@ -95,6 +95,16 @@ namespace Zafu.Testing.Logging.Tests {
 					// assert
 					Assert.Equal(expected, actual_equal);
 					Assert.Equal(expected, actual_objectEqual);
+				}
+
+				// test GetHashCode methods
+				if (object.ReferenceEquals(x, null) == false && object.ReferenceEquals(y, null) == false) {
+					// act
+					int hash_x = x.GetHashCode();
+					int hash_y = y.GetHashCode();
+
+					// assert
+					Assert.Equal(expected, hash_x == hash_y);
 				}
 			}
 
@@ -163,43 +173,6 @@ namespace Zafu.Testing.Logging.Tests {
 			}
 
 			#endregion
-		}
-
-		#endregion
-
-
-		#region GetHashCode
-
-		public class HashCode {
-			[Fact(DisplayName = "same")]
-			public void same() {
-				// arrange
-				EndScopeData x = Sample;
-				// create a clone not to equal to x as a reference 
-				EndScopeData y = new EndScopeData(x);
-				Debug.Assert(object.ReferenceEquals(x, y) == false);
-
-				// act
-				int actual_x = x.GetHashCode();
-				int actual_y = y.GetHashCode();
-
-				// assert
-				Assert.Equal(actual_x, actual_y);
-			}
-
-			[Fact(DisplayName = "different")]
-			public void different() {
-				// arrange
-				EndScopeData x = Sample;
-				EndScopeData y = new EndScopeData(new TestingDisposable());
-
-				// act
-				int actual_x = x.GetHashCode();
-				int actual_y = y.GetHashCode();
-
-				// assert
-				Assert.NotEqual(actual_x, actual_y);
-			}
 		}
 
 		#endregion

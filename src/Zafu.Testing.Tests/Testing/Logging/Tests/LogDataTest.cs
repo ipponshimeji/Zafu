@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
+using Zafu.Logging;
 using Xunit;
 
 namespace Zafu.Testing.Logging.Tests {
 	public class LogDataTest {
 		#region samples
 
-		public static readonly LogData Sample = LogData.Create<Version>(new Version(1, 2), LogLevel.Information, new EventId(51, "test"), new NotImplementedException());
+		public static readonly LogData Sample = LogData.Create<Version>(new Version(1, 2), LogLevel.Information, new NotImplementedException(), new EventId(51, "test"));
 
 		#endregion
 
@@ -25,7 +26,7 @@ namespace Zafu.Testing.Logging.Tests {
 				EventId eventId = new EventId(123, "warning event");
 				object? state = new Uri("http://example.org/");
 				Exception? exception = new SystemException();
-				Delegate formatter = (Func<Uri, Exception?, string>)LogData.DefaultFormatter<Uri>;
+				Delegate formatter = (Func<Uri, Exception?, string>)LoggingUtil.DefaultFormatter<Uri>;
 
 				// act
 				LogData actual = new LogData(stateType, logLevel, eventId, state, exception, formatter);
@@ -47,7 +48,7 @@ namespace Zafu.Testing.Logging.Tests {
 				EventId eventId = new EventId(123, "warning event");
 				object? state = new Uri("http://example.org/");
 				Exception? exception = new SystemException();
-				Delegate formatter = (Func<Uri, Exception?, string>)LogData.DefaultFormatter<Uri>;
+				Delegate formatter = (Func<Uri, Exception?, string>)LoggingUtil.DefaultFormatter<Uri>;
 
 				// act
 				ArgumentNullException actual = Assert.Throws<ArgumentNullException>(() => {
@@ -66,7 +67,7 @@ namespace Zafu.Testing.Logging.Tests {
 				EventId eventId = new EventId(123, "warning event");
 				object? state = new Version(1, 2);
 				Exception? exception = new SystemException();
-				Delegate formatter = (Func<Uri, Exception?, string>)LogData.DefaultFormatter<Uri>;
+				Delegate formatter = (Func<Uri, Exception?, string>)LoggingUtil.DefaultFormatter<Uri>;
 
 				// act
 				ArgumentException actual = Assert.Throws<ArgumentException>(() => {
@@ -113,16 +114,89 @@ namespace Zafu.Testing.Logging.Tests {
 			public void Create() {
 				// arrange
 				LogLevel logLevel = LogLevel.Warning;
-				EventId eventId = new EventId(123, "warning event");
 				Uri state = new Uri("http://example.org/");
 				Exception? exception = new SystemException();
-				Func<Uri, Exception, string> formatter = LogData.DefaultFormatter<Uri>;
+				EventId eventId = new EventId(123, "warning event");
+				Func<Uri, Exception, string> formatter = LoggingUtil.DefaultFormatter<Uri>;
 
 				// act
-				LogData actual = LogData.Create<Uri>(state, logLevel, eventId, exception, formatter);
+				LogData actual = LogData.Create<Uri>(state, logLevel, exception, eventId, formatter);
 
 				// assert
 				Assert.Equal(typeof(Uri), actual.StateType);
+				Assert.Equal(logLevel, actual.LogLevel);
+				Assert.Equal(eventId, actual.EventId);
+				Assert.Equal(state, actual.State);
+				Assert.Equal(exception, actual.Exception);
+				Assert.Equal(formatter, actual.Formatter);
+			}
+
+			[Fact(DisplayName = "CreateWithSimpleState")]
+			public void CreateWithSimpleState() {
+				// arrange
+				string source = "method1";
+				string message = "OK";
+				SimpleState state = new SimpleState(source, message);
+				LogLevel logLevel = LogLevel.Trace;
+				EventId eventId = new EventId(123, "trace");
+				Exception? exception = new SystemException();
+				Func<SimpleState, Exception?, string> formatter = LoggingUtil.JsonFormatter;
+
+				// act
+				LogData actual = LogData.CreateWithSimpleState(source, message, logLevel, exception, eventId);
+
+				// assert
+				Assert.Equal(typeof(SimpleState), actual.StateType);
+				Assert.Equal(logLevel, actual.LogLevel);
+				Assert.Equal(eventId, actual.EventId);
+				Assert.Equal(state, actual.State);
+				Assert.Equal(exception, actual.Exception);
+				Assert.Equal(formatter, actual.Formatter);
+			}
+
+			[Fact(DisplayName = "CreateWithSimpleState<T>; T: int")]
+			public void CreateWithSimpleState_int() {
+				// arrange
+				string source = "method1";
+				string message = "OK";
+				string extraPropName = "index";
+				int extraPropValue = 5;
+				SimpleState<int> state = new SimpleState<int>(source, message, extraPropName, extraPropValue);
+				LogLevel logLevel = LogLevel.Debug;
+				EventId eventId = new EventId(78, "debugging");
+				Exception? exception = new SystemException();
+				Func<SimpleState<int>, Exception?, string> formatter = LoggingUtil.JsonFormatter<int>;
+
+				// act
+				LogData actual = LogData.CreateWithSimpleState<int>(source, message, extraPropName, extraPropValue, logLevel, exception, eventId);
+
+				// assert
+				Assert.Equal(typeof(SimpleState<int>), actual.StateType);
+				Assert.Equal(logLevel, actual.LogLevel);
+				Assert.Equal(eventId, actual.EventId);
+				Assert.Equal(state, actual.State);
+				Assert.Equal(exception, actual.Exception);
+				Assert.Equal(formatter, actual.Formatter);
+			}
+
+			[Fact(DisplayName = "CreateWithSimpleState<T>; T: string")]
+			public void CreateWithSimpleState_string() {
+				// arrange
+				string source = "method1";
+				string message = "OK";
+				string extraPropName = "description";
+				string extraPropValue = "general";
+				SimpleState<string> state = new SimpleState<string>(source, message, extraPropName, extraPropValue);
+				LogLevel logLevel = LogLevel.Information;
+				EventId eventId = new EventId(29, "information");
+				Exception? exception = new SystemException();
+				Func<SimpleState<string>, Exception?, string> formatter = LoggingUtil.JsonFormatter<string>;
+
+				// act
+				LogData actual = LogData.CreateWithSimpleState<string>(source, message, extraPropName, extraPropValue, logLevel, exception, eventId);
+
+				// assert
+				Assert.Equal(typeof(SimpleState<string>), actual.StateType);
 				Assert.Equal(logLevel, actual.LogLevel);
 				Assert.Equal(eventId, actual.EventId);
 				Assert.Equal(state, actual.State);
@@ -134,7 +208,7 @@ namespace Zafu.Testing.Logging.Tests {
 		#endregion
 
 
-		#region comparison
+		#region comparison (including GetHashCode)
 
 		public class Comparison {
 			#region utilities
@@ -158,6 +232,14 @@ namespace Zafu.Testing.Logging.Tests {
 					// assert
 					Assert.Equal(expected, actual_equal);
 					Assert.Equal(expected, actual_objectEqual);
+				}
+
+				// test hash code
+				if (object.ReferenceEquals(x, null) == false && object.ReferenceEquals(y, null) == false) {
+					int hash_x = x.GetHashCode();
+					int hash_y = y.GetHashCode();
+
+					Assert.Equal(expected, hash_x == hash_y);
 				}
 			}
 
@@ -291,43 +373,6 @@ namespace Zafu.Testing.Logging.Tests {
 			}
 
 			#endregion
-		}
-
-		#endregion
-
-
-		#region GetHashCode
-
-		public class HashCode {
-			[Fact(DisplayName = "same")]
-			public void same() {
-				// arrange
-				LogData x = Sample;
-				// create a clone not to equal to x as a reference 
-				LogData y = new LogData(x);
-				Debug.Assert(object.ReferenceEquals(x, y) == false);
-
-				// act
-				int actual_x = x.GetHashCode();
-				int actual_y = y.GetHashCode();
-
-				// assert
-				Assert.Equal(actual_x, actual_y);
-			}
-
-			[Fact(DisplayName = "different")]
-			public void different() {
-				// arrange
-				LogData x = Sample;
-				LogData y = new LogData(typeof(Uri), LogLevel.Critical, default(EventId), null, null, null);
-
-				// act
-				int actual_x = x.GetHashCode();
-				int actual_y = y.GetHashCode();
-
-				// assert
-				Assert.NotEqual(actual_x, actual_y);
-			}
 		}
 
 		#endregion

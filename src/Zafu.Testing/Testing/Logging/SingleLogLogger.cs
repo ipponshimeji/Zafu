@@ -49,7 +49,7 @@ namespace Zafu.Testing.Logging {
 			}
 
 			// store the log data
-			this.Data = LogData.Create<TState>(state, logLevel, eventId, exception, formatter);
+			this.Data = LogData.Create<TState>(state, logLevel, exception, eventId, formatter);
 			this.Message = (formatter == null) ? null : formatter(state, exception);
 		}
 
