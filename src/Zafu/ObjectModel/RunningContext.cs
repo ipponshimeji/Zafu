@@ -20,7 +20,7 @@ namespace Zafu.ObjectModel {
 
 		#region creation
 
-		public RunningContext(ILogger logger, IRunningTaskMonitor runningTaskMonitor) {
+		public RunningContext(ILogger? logger, IRunningTaskMonitor? runningTaskMonitor) {
 			// check arguments
 			if (logger == null) {
 				logger = NullLogger.Instance;
@@ -34,7 +34,10 @@ namespace Zafu.ObjectModel {
 			this.runningTaskMonitor = runningTaskMonitor;
 		}
 
-		public RunningContext(ILogger logger, Func<IRunningContext, IRunningTaskMonitor> runningTaskMonitorCreator) {
+		public RunningContext(ILogger? logger): this(logger, (IRunningTaskMonitor?)null) {
+		}
+
+		public RunningContext(ILogger? logger, Func<IRunningContext, IRunningTaskMonitor> runningTaskMonitorCreator) {
 			// check arguments
 			if (logger == null) {
 				logger = NullLogger.Instance;

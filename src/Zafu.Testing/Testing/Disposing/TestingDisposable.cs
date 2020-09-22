@@ -18,11 +18,7 @@ namespace Zafu.Testing.Disposing {
 
 		#region properties
 
-		public int DisposeCount {
-			get {
-				return this.disposeCount;
-			}
-		}
+		public int DisposeCount => this.disposeCount;
 
 		#endregion
 

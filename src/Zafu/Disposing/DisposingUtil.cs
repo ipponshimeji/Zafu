@@ -58,7 +58,7 @@ namespace Zafu.Disposing {
 			}
 		}
 
-		public static void ClearDisposablesLoggingException<T>(ref T? disposables, IRunningContext? runningContext = null) where T : class, IEnumerable<IDisposable> {
+		public static void ClearDisposablesLoggingException<T>(ref T? disposables, IRunningContext? runningContext = null) where T : class, IEnumerable<IDisposable?> {
 			T? value = Interlocked.Exchange(ref disposables, null);
 			if (value != null) {
 				DisposeLoggingException(value, runningContext);
@@ -81,9 +81,12 @@ namespace Zafu.Disposing {
 			} catch (Exception exception) {
 				// if an exception is thrown, log it
 				if (runningContext.LoggingLevel <= LogLevel.Error) {
-					string indexInfo = (0 <= index) ? $" at index {index}," : string.Empty;
-					string message = $"An exception is thrown during a Dispose() call{indexInfo}.";
-					LoggingUtil.LogError(runningContext.Logger, NameForLogging, message, exception);
+					string message = "An exception is thrown during a Dispose() call.";
+					if (0 <= index) {
+						LoggingUtil.LogError<int>(runningContext.Logger, NameForLogging, message, "index", index, exception);
+					} else {
+						LoggingUtil.LogError(runningContext.Logger, NameForLogging, message, exception);
+					}
 				}
 			}
 		}
