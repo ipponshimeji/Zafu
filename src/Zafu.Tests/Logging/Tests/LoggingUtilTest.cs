@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Xunit;
 using Zafu.Testing;
 using Zafu.Testing.Logging;
+using Zafu.Testing.Samples;
 
 namespace Zafu.Logging.Tests {
 	public class LoggingUtilTest {

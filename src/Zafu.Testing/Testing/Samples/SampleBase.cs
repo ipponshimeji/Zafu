@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 
 
-namespace Zafu.Testing {
+namespace Zafu.Testing.Samples {
 	public class SampleBase {
 		#region data
 

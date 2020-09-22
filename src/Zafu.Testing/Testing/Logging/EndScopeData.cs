@@ -46,7 +46,8 @@ namespace Zafu.Testing.Logging {
 				if (object.ReferenceEquals(y, null)) {
 					return false;
 				} else {
-					return x.Scope == y.Scope;
+					// Do not compare by (x.Scope == y.Scope). That is a reference comparison.
+					return object.Equals(x.Scope, y.Scope);
 				}
 			}
 		}

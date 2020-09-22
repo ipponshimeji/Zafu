@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using Xunit;
 using Zafu.Testing.Disposing;
+using Zafu.Testing.Samples;
 
 namespace Zafu.Testing.Logging.Tests {
 	public class BeginScopeDataTest {
@@ -190,6 +191,23 @@ namespace Zafu.Testing.Logging.Tests {
 				// arrange
 				BeginScopeData? x = null;
 				BeginScopeData? y = null;
+
+				// act & assert
+				Test(x, y, expected: true);
+			}
+
+			[Fact(DisplayName = "same; State: object without equality operator")]
+			public void same_State_WithoutEqualityOperator() {
+				// arrange
+				int stateValue = 7;
+				ObjectWithoutEqualityOperator state1 = new ObjectWithoutEqualityOperator(stateValue);
+				ObjectWithoutEqualityOperator state2 = new ObjectWithoutEqualityOperator(stateValue);
+				Debug.Assert(state1.Equals(state2));
+				Debug.Assert(state1 != state2); // states don't define equality operator so it compares references
+
+				BeginScopeData x = BeginScopeData.Create<ObjectWithoutEqualityOperator>(state1, SampleScope);
+				BeginScopeData y = BeginScopeData.Create<ObjectWithoutEqualityOperator>(state2, SampleScope);
+				Debug.Assert(object.ReferenceEquals(x, y) == false);
 
 				// act & assert
 				Test(x, y, expected: true);

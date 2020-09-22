@@ -100,8 +100,9 @@ namespace Zafu.Testing.Logging {
 						x.LogLevel == y.LogLevel &&
 						x.EventId == y.EventId &&
 						x.StateType == y.StateType &&
-						x.State == y.State &&
-						x.Exception == y.Exception &&
+						// Do not compare by (x.State == y.State). That is a reference comparison.
+						object.Equals(x.State, y.State) &&
+						object.Equals(x.Exception, y.Exception) &&
 						x.Formatter == y.Formatter
 					);
 				}				

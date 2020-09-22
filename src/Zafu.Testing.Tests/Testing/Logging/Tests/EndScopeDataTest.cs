@@ -2,9 +2,33 @@
 using System.Diagnostics;
 using Xunit;
 using Zafu.Testing.Disposing;
+using Zafu.Testing.Samples;
 
 namespace Zafu.Testing.Logging.Tests {
 	public class EndScopeDataTest {
+		#region types
+
+		public class ScopeWithoutEqualityOperator: ObjectWithoutEqualityOperator, IDisposable {
+			#region constructor
+
+			public ScopeWithoutEqualityOperator(int value): base(value) {
+			}
+
+			#endregion
+
+
+			#region IDisposable
+
+			public void Dispose() {
+				// do nothing
+			}
+
+			#endregion
+		}
+
+		#endregion
+
+
 		#region samples
 
 		public static readonly IDisposable SampleScope = new TestingDisposable();
@@ -130,6 +154,23 @@ namespace Zafu.Testing.Logging.Tests {
 				// arrange
 				EndScopeData? x = null;
 				EndScopeData? y = null;
+
+				// act & assert
+				Test(x, y, expected: true);
+			}
+
+			[Fact(DisplayName = "same; Scope: object without equality operator")]
+			public void same_Scope_WithoutEqualityOperator() {
+				// arrange
+				int stateValue = 1;
+				ScopeWithoutEqualityOperator scope1 = new ScopeWithoutEqualityOperator(stateValue);
+				ScopeWithoutEqualityOperator scope2 = new ScopeWithoutEqualityOperator(stateValue);
+				Debug.Assert(scope1.Equals(scope2));
+				Debug.Assert(scope1 != scope2); // scopes don't define equality operator so it compares references
+
+				EndScopeData x = new EndScopeData(scope1);
+				EndScopeData y = new EndScopeData(scope2);
+				Debug.Assert(object.ReferenceEquals(x, y) == false);
 
 				// act & assert
 				Test(x, y, expected: true);

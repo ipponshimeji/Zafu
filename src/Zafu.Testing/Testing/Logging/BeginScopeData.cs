@@ -66,7 +66,8 @@ namespace Zafu.Testing.Logging {
 				} else {
 					return (
 						x.StateType == y.StateType &&
-						x.State == y.State &&
+						// Do not compare by (x.State == y.State). That is a reference comparison.
+						object.Equals(x.State, y.State) &&
 						x.Scope == y.Scope
 					);
 				}

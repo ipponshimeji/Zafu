@@ -10,7 +10,7 @@ namespace Zafu.Logging.Tests {
 	public class SimpleStateTest {
 		#region samples
 
-		public class SampleBase<T>: Zafu.Testing.SampleBase<T> {
+		public class SampleBase<T>: Zafu.Testing.Samples.SampleBase<T> {
 			#region data
 
 			public readonly string Text;

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Zafu.Logging;
+using Zafu.Testing.Samples;
 using Xunit;
 
 namespace Zafu.Testing.Logging.Tests {
@@ -265,6 +266,23 @@ namespace Zafu.Testing.Logging.Tests {
 				// arrange
 				LogData? x = null;
 				LogData? y = null;
+
+				// act & assert
+				Test(x, y, expected: true);
+			}
+
+			[Fact(DisplayName = "same; State: object without equality operator")]
+			public void same_State_WithoutEqualityOperator() {
+				// arrange
+				int stateValue = -9;
+				ObjectWithoutEqualityOperator state1 = new ObjectWithoutEqualityOperator(stateValue);
+				ObjectWithoutEqualityOperator state2 = new ObjectWithoutEqualityOperator(stateValue);
+				Debug.Assert(state1.Equals(state2));
+				Debug.Assert(state1 != state2); // states don't define equality operator so it compares references
+
+				LogData x = LogData.Create<ObjectWithoutEqualityOperator>(state1, LogLevel.Information);
+				LogData y = LogData.Create<ObjectWithoutEqualityOperator>(state2, LogLevel.Information);
+				Debug.Assert(object.ReferenceEquals(x, y) == false);
 
 				// act & assert
 				Test(x, y, expected: true);
