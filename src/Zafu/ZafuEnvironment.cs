@@ -36,9 +36,9 @@ namespace Zafu {
 
 		private RelayingLogger? relayingLogger = null;
 
-		private TimeSpan disposeWaitingTimeout = IRunningTaskMonitor.DefaultDisposeWaitingTimeout;
+		private TimeSpan disposeWaitingTimeout = IRunningTaskTable.DefaultDisposeWaitingTimeout;
 
-		private TimeSpan disposeCancelingTimeout = IRunningTaskMonitor.DefaultDisposeCancelingTimeout;
+		private TimeSpan disposeCancelingTimeout = IRunningTaskTable.DefaultDisposeCancelingTimeout;
 
 		private bool disposed = false;
 

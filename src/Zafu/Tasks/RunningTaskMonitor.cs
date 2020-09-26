@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using Zafu.ObjectModel;
 
 namespace Zafu.Tasks {
-	public class RunningTaskMonitor: DisposableObject, IRunningTaskMonitor {
+	public class RunningTaskMonitor: DisposableObject, IRunningTaskTable, IRunningTaskMonitor {
 		#region types
 
 		public class RunningTask: IRunningTask {
@@ -175,9 +175,16 @@ namespace Zafu.Tasks {
 
 		protected override void Dispose(bool disposing) {
 			if (disposing) {
-				Dispose(IRunningTaskMonitor.DefaultDisposeWaitingTimeout, IRunningTaskMonitor.DefaultDisposeCancelingTimeout);
+				Dispose(IRunningTaskTable.DefaultDisposeWaitingTimeout, IRunningTaskTable.DefaultDisposeCancelingTimeout);
 			}
 		}
+
+		#endregion
+
+
+		#region IRunningTaskTable
+
+		public virtual IRunningTaskMonitor Monitor => this;
 
 		public virtual bool Dispose(TimeSpan waitingTimeout, TimeSpan cancelingTimeOut) {
 			// Note that waitingTimeout and cancelingTimeOut may be -1 millisecond, which means "infinite".
@@ -185,11 +192,11 @@ namespace Zafu.Tasks {
 			Task[] tasks;
 
 			static Task[] getTasks(HashSet<RunningTask> set) {
-				return set.Select(rt => rt.Task).ToArray();				
+				return set.Select(rt => rt.Task).ToArray();
 			}
 
 			static bool waitForTasks(Task[] t, TimeSpan timeout) {
-				return (0 < t.Length)? Task.WaitAll(t, timeout): true;
+				return (0 < t.Length) ? Task.WaitAll(t, timeout) : true;
 			}
 
 			// try to wait for completion of the current running tasks
