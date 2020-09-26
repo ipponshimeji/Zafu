@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Zafu.ObjectModel;
 
 namespace Zafu.Tasks {
 	public interface IRunningTaskMonitor {
@@ -9,8 +8,17 @@ namespace Zafu.Tasks {
 
 		IRunningTask MonitorTask(Action action);
 
-		IRunningTask? MonitorTask(Task task, CancellationTokenSource? cancellationTokenSource = null, bool dontDisposeCancellationTokenSource = false);
+		IRunningTask? MonitorTask(Task task, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false);
 
-		IRunningTask? MonitorTask(ValueTask task, CancellationTokenSource? cancellationTokenSource = null, bool dontDisposeCancellationTokenSource = false);
+		IRunningTask? MonitorTask(ValueTask valueTask, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false) {
+			// check argument
+			if (valueTask.IsCompletedSuccessfully) {
+				// nothing to do
+				return null;
+			}
+			// cancellationTokenSource can be null
+
+			return MonitorTask(valueTask.AsTask(), cancellationTokenSource, doNotDisposeCancellationTokenSource);
+		}
 	}
 }

@@ -9,137 +9,6 @@ using Zafu.ObjectModel;
 
 namespace Zafu.Tasks {
 	public class RunningTaskTable: DisposableObject, IRunningTaskTable, IRunningTaskMonitor {
-		#region types
-
-		public class RunningTask: IRunningTask {
-			#region data
-
-			private static int lastId = 0;
-
-
-			private readonly object instanceLocker = new object();
-
-			private readonly int id;
-
-			private readonly Task task;
-
-			private CancellationTokenSource? cancellationTokenSource;
-
-			/// <summary>
-			/// Whether this object can dispose <see cref="cancellationTokenSource"/> after the running task finishes.
-			/// </summary>
-			private readonly bool dontDisposeCancellationTokenSource;
-
-			/// <summary>
-			/// The value which <see cref="IsCancellationRequested"/> returns.
-			/// After <see cref="cancellationTokenSource"/> is disposed,
-			/// this value is used to keep the <see cref="IsCancellationRequested"/> value.
-			/// </summary>
-			private bool isCancellationRequestedEmulator = false;
-
-			#endregion
-
-
-			#region creation & disposal
-
-			public RunningTask(Task task, CancellationTokenSource? cancellationTokenSource, bool dontDisposeCancellationTokenSource) {
-				// check argument
-				Debug.Assert(task != null);
-				// cancellationTokenSource can be null
-
-				// initialize members
-				this.id = Interlocked.Increment(ref lastId);
-				this.task = task;
-				this.cancellationTokenSource = cancellationTokenSource;
-				this.dontDisposeCancellationTokenSource = dontDisposeCancellationTokenSource;
-				Debug.Assert(this.isCancellationRequestedEmulator == false);
-			}
-
-			public void DisposeCancellationTokenSource() {
-				// replace the this.cancellationTokenSource with null
-				CancellationTokenSource? cts;
-				lock (this.instanceLocker) {
-					cts = this.cancellationTokenSource;
-					this.cancellationTokenSource = null;
-				}
-
-				// dispose the CancellationTokenSource if necessary
-				if (cts != null && this.dontDisposeCancellationTokenSource == false) {
-					// back up the cts.IsCancellationRequested property value before it is disposed
-					this.isCancellationRequestedEmulator = cts.IsCancellationRequested;
-					cts.Dispose();
-				}
-			}
-
-			#endregion
-
-
-			#region IRunningTask
-
-			public int Id => this.id;
-
-			public Task Task => this.task;
-
-			public bool IsCancellationRequested {
-				get {
-					lock (this.instanceLocker) {
-						CancellationTokenSource? cts = this.cancellationTokenSource;
-						// return the emulation value after the cancellationTokenSource is disposed
-						return (cts == null) ? this.isCancellationRequestedEmulator: cts.IsCancellationRequested;
-					}
-				}
-			}
-
-			public void Cancel() {
-				lock (this.instanceLocker) {
-					CancellationTokenSource? cts = this.cancellationTokenSource;
-					if (cts != null) {
-						cts.Cancel();
-					} else {
-						this.isCancellationRequestedEmulator = true;
-					}
-				}
-			}
-
-			public void Cancel(bool throwOnFirstException) {
-				lock (this.instanceLocker) {
-					CancellationTokenSource? cts = this.cancellationTokenSource;
-					if (cts != null) {
-						cts.Cancel(throwOnFirstException);
-					} else {
-						this.isCancellationRequestedEmulator = true;
-					}
-				}
-			}
-
-			public void CancelAfter(int millisecondsDelay) {
-				lock (this.instanceLocker) {
-					CancellationTokenSource? cts = this.cancellationTokenSource;
-					if (cts != null) {
-						cts.CancelAfter(millisecondsDelay);
-					} else {
-						this.isCancellationRequestedEmulator = true;
-					}
-				}
-			}
-
-			public void CancelAfter(TimeSpan delay) {
-				lock (this.instanceLocker) {
-					CancellationTokenSource? cts = this.cancellationTokenSource;
-					if (cts != null) {
-						cts.CancelAfter(delay);
-					} else {
-						this.isCancellationRequestedEmulator = true;
-					}
-				}
-			}
-
-			#endregion
-		}
-
-		#endregion
-
-
 		#region constants
 
 		public const string DefaultName = "RunningTaskMonitor";
@@ -184,7 +53,7 @@ namespace Zafu.Tasks {
 
 		#region IRunningTaskTable
 
-		public virtual IRunningTaskMonitor Monitor => this;
+		public virtual IRunningTaskMonitor RunningTaskMonitor => this;
 
 		public virtual bool Dispose(TimeSpan waitingTimeout, TimeSpan cancelingTimeOut) {
 			// Note that waitingTimeout and cancelingTimeOut may be -1 millisecond, which means "infinite".
@@ -240,28 +109,23 @@ namespace Zafu.Tasks {
 				throw new ArgumentNullException(nameof(action));
 			}
 
-			CancellationTokenSource cts = new CancellationTokenSource();
+			// create a RunningTask object for the action
+			RunningTask runningTask = RunningTask.Create((RunningTask rt, CancellationToken ct) => {
+				Debug.Assert(rt != null);
+				try {
+					action(ct);
+				} catch (Exception exception) {
+					OnTaskException(rt, exception);
+					throw;
+				} finally {
+					UnregisterRunningTask(rt);
+				}
+			});
 			try {
-				// create task related resources
-				RunningTask? runningTask = null;
-				CancellationToken cancellationToken = cts.Token;
-				Task task = new Task(() => {
-					Debug.Assert(runningTask != null);
-					try {
-						action(cancellationToken);
-					} catch (Exception exception) {
-						OnTaskException(runningTask, exception);
-						throw;
-					} finally {
-						RemoveRunningTask(runningTask);
-						runningTask.DisposeCancellationTokenSource();
-					}
-				}, cancellationToken);
-
 				// register the task to the running task table and start it
-				return AddRunningTaskAndStart(task, cancellationTokenSource: cts, dontDisposeCancellationTokenSource: false);
+				return RegisterRunningTaskAndStart(runningTask);
 			} catch {
-				cts.Dispose();
+				runningTask.DisposeCancellationTokenSource();
 				throw;
 			}
 		}
@@ -272,25 +136,28 @@ namespace Zafu.Tasks {
 				throw new ArgumentNullException(nameof(action));
 			}
 
-			// create task resources
-			RunningTask? runningTask = null;
-			Task task = new Task(() => {
-				Debug.Assert(runningTask != null);
+			// create a RunningTask object for the action
+			RunningTask runningTask = RunningTask.Create((RunningTask rt) => {
+				Debug.Assert(rt != null);
 				try {
 					action();
 				} catch (Exception exception) {
-					OnTaskException(runningTask, exception);
+					OnTaskException(rt, exception);
 					throw;
 				} finally {
-					RemoveRunningTask(runningTask);
+					UnregisterRunningTask(rt);
 				}
 			});
-
-			// register the task to the running task table and start it
-			return AddRunningTaskAndStart(task, cancellationTokenSource: null, dontDisposeCancellationTokenSource: false);
+			try {
+				// register the task to the running task table and start it
+				return RegisterRunningTaskAndStart(runningTask);
+			} catch {
+				runningTask.DisposeCancellationTokenSource();
+				throw;
+			}
 		}
 
-		public virtual IRunningTask? MonitorTask(Task task, CancellationTokenSource? cancellationTokenSource = null, bool dontDisposeCancellationTokenSource = false) {
+		public virtual IRunningTask? MonitorTask(Task task, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
 			// check argument
 			if (task == null) {
 				throw new ArgumentNullException(nameof(task));
@@ -301,35 +168,26 @@ namespace Zafu.Tasks {
 			}
 			// cancellationTokenSource can be null
 
-			// create task resources
-			RunningTask? runningTask = null;
-			CancellationToken cancellationToken = (cancellationTokenSource != null)? cancellationTokenSource.Token: CancellationToken.None;
-			Task outerTask = new Task(async () => {
-				Debug.Assert(runningTask != null);
+			// create a RunningTask object for the task
+			RunningTask runningTask = RunningTask.Create((RunningTask rt) => {
+				Debug.Assert(rt != null);
 				try {
-					await task;
+					task.Wait();
 				} catch (Exception exception) {
-					OnTaskException(runningTask, exception);
+					// TODO: should unwrap AggregateException?
+					OnTaskException(rt, exception);
 					throw;
 				} finally {
-					RemoveRunningTask(runningTask);
-					runningTask.DisposeCancellationTokenSource();
+					UnregisterRunningTask(rt);
 				}
-			}, cancellationToken);
-
-			// register the task to the running task table and start it
-			return AddRunningTaskAndStart(outerTask, cancellationTokenSource, dontDisposeCancellationTokenSource);
-		}
-
-		public virtual IRunningTask? MonitorTask(ValueTask valueTask, CancellationTokenSource? cancellationTokenSource = null, bool dontDisposeCancellationTokenSource = false) {
-			// check argument
-			if (valueTask.IsCompletedSuccessfully) {
-				// nothing to do
-				return null;
+			}, cancellationTokenSource, doNotDisposeCancellationTokenSource);
+			try {
+				// register the task to the running task table and start it
+				return RegisterRunningTaskAndStart(runningTask);
+			} catch {
+				runningTask.DisposeCancellationTokenSource();
+				throw;
 			}
-			// cancellationTokenSource can be null
-
-			return MonitorTask(valueTask.AsTask(), cancellationTokenSource, dontDisposeCancellationTokenSource);
 		}
 
 		#endregion
@@ -363,7 +221,7 @@ namespace Zafu.Tasks {
 
 		#region privates
 
-		private void AddRunningTask(RunningTask runningTask) {
+		private void RegisterRunningTask(RunningTask runningTask) {
 			// check argument
 			Debug.Assert(runningTask != null);
 
@@ -371,50 +229,48 @@ namespace Zafu.Tasks {
 				// check state
 				EnsureNotDisposed();
 
-				// add the running task to the running task table
+				// register the running task to the running task table
 				Debug.Assert(this.runningTasks.Contains(runningTask) == false);
 				this.runningTasks.Add(runningTask);
 			}
 
-			// log
+			// log registration
 			LogLevel logLevel = LogLevel.Debug;
 			if (this.LoggingLevel <= logLevel) {
 				Log(runningTask, logLevel, "A running task was registered.");
 			}
 		}
 
-		private void RemoveRunningTask(RunningTask runningTask) {
+		private void UnregisterRunningTask(RunningTask runningTask) {
 			// check argument
 			Debug.Assert(runningTask != null);
 
-			// remove the running task from the running task table
+			// unregister the running task from the running task table
 			lock (this.InstanceLocker) {
 				this.runningTasks.Remove(runningTask);
 			}
 
-			// log
+			// log unregistration
 			LogLevel logLevel = LogLevel.Debug;
 			if (this.LoggingLevel <= logLevel) {
 				Log(runningTask, logLevel, "The running task was unregistered.");
 			}
 		}
 
-		private IRunningTask AddRunningTaskAndStart(Task task, CancellationTokenSource? cancellationTokenSource, bool dontDisposeCancellationTokenSource) {
+		private IRunningTask RegisterRunningTaskAndStart(RunningTask runningTask) {
 			// check arguments
-			Debug.Assert(task != null);
-			// cancellationTokenSource can be null
+			Debug.Assert(runningTask != null);
 
 			// register the task to the running task table
-			RunningTask runningTask = new RunningTask(task, cancellationTokenSource, dontDisposeCancellationTokenSource);
-			AddRunningTask(runningTask);
+			RegisterRunningTask(runningTask);
 			try {
 				// start the task
 				// Make sure that the task starts after it is registered to the running task table.
-				// Otherwise, AddRunningTask() may run after RemoveRunningTask() and
+				// Otherwise, RegisterRunningTask() may run after UnregisterRunningTask() and
 				// the entry would remain forever if the task finishes immediately.
-				task.Start();
+				runningTask.Task.Start();
 			} catch (Exception exception) {
-				RemoveRunningTask(runningTask);
+				UnregisterRunningTask(runningTask);
 				if (this.LoggingLevel <= LogLevel.Error) {
 					Log(runningTask, LogLevel.Error, "The task failed to start.", exception);
 				}

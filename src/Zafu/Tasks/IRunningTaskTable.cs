@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
-using Zafu.ObjectModel;
 
 namespace Zafu.Tasks {
 	public interface IRunningTaskTable: IDisposable {
@@ -9,7 +7,7 @@ namespace Zafu.Tasks {
 		public static readonly TimeSpan DefaultDisposeCancelingTimeout = TimeSpan.FromSeconds(3);
 
 
-		IRunningTaskMonitor Monitor { get; }
+		IRunningTaskMonitor RunningTaskMonitor { get; }
 
 		bool Dispose(TimeSpan waitingTimeout, TimeSpan cancelingTimeOut);
 	}

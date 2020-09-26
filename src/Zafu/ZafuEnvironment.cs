@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -9,7 +8,7 @@ using Zafu.ObjectModel;
 using Zafu.Tasks;
 
 namespace Zafu {
-	public class ZafuEnvironment: IRunningContext, IDisposable {
+	public class ZafuEnvironment: RunningEnvironment {
 		#region constants
 
 		public const string LoggingCategoryName = "Zafu";
@@ -28,19 +27,7 @@ namespace Zafu {
 
 		private readonly object instanceLocker = new object();
 
-		public LogLevel LoggingLevel { get; set; } = IRunningContext.DefaultLogLevel;
-
-		private ILogger logger;
-
-		private readonly RunningTaskTable runningTaskMonitor;
-
 		private RelayingLogger? relayingLogger = null;
-
-		private TimeSpan disposeWaitingTimeout = IRunningTaskTable.DefaultDisposeWaitingTimeout;
-
-		private TimeSpan disposeCancelingTimeout = IRunningTaskTable.DefaultDisposeCancelingTimeout;
-
-		private bool disposed = false;
 
 		#endregion
 
@@ -60,57 +47,35 @@ namespace Zafu {
 			}
 		}
 
-
-		public TimeSpan DisposeWaitingTimeout {
-			get {
-				return this.disposeWaitingTimeout;
-			}
-			set {
-				// check argument
-				if (value.TotalMilliseconds < 0 && value != Timeout.InfiniteTimeSpan) {
-					throw new ArgumentOutOfRangeException(nameof(value));
-				}
-
-				lock (this.instanceLocker) {
-					this.disposeWaitingTimeout = value;
-				}
-			}
-		}
-
-		public TimeSpan DisposeCancelingTimeout {
-			get {
-				return this.disposeCancelingTimeout;
-			}
-			set {
-				// check argument
-				if (value.TotalMilliseconds < 0 && value != Timeout.InfiniteTimeSpan) {
-					throw new ArgumentOutOfRangeException(nameof(value));
-				}
-
-				lock (this.instanceLocker) {
-					this.disposeCancelingTimeout = value;
-				}
-			}
-		}
-
 		#endregion
 
 
 		#region creation & disposal
 
-		public ZafuEnvironment(ILogger logger, IConfigurationSection? config = null) {
-			// check arguments
-			if (logger == null) {
-				logger = NullLogger.Instance;
-			}
-
+		protected ZafuEnvironment(ILogger? logger, Func<IRunningContext, IRunningTaskTable> runningTaskTableCreator, IConfigurationSection? config): base(logger, runningTaskTableCreator) {
 			// initialize members
-			this.logger = logger;
-			this.runningTaskMonitor = CreateRunningTaskMonitor(config);
 			InitializeThisClassLevel(config);
 		}
 
-		public ZafuEnvironment(ILoggerFactory loggerFactory, string? categoryName = null, IConfigurationSection? config = null) {
+		protected ZafuEnvironment(RelayingLogger relayingLogger, Func<IRunningContext, IRunningTaskTable> runningTaskTableCreator, IConfigurationSection? config) : base(relayingLogger, runningTaskTableCreator) {
+			// initialize members
+			this.relayingLogger = relayingLogger;
+			InitializeThisClassLevel(config);
+		}
+
+
+		public static ZafuEnvironment Create(ILogger? logger, IConfigurationSection? config = null) {
+			// check arguments
+			// logger can be null
+			// config can be null
+
+			// prepare parameters
+			Func<IRunningContext, IRunningTaskTable> runningTaskTableCreator = GetRunningTaskTableCreator(config);
+
+			return new ZafuEnvironment(logger, runningTaskTableCreator, config);
+		}
+
+		public static ZafuEnvironment Create(ILoggerFactory loggerFactory, string? categoryName = null, IConfigurationSection? config = null) {
 			// check arguments
 			if (loggerFactory == null) {
 				throw new ArgumentNullException(nameof(loggerFactory));
@@ -118,26 +83,33 @@ namespace Zafu {
 			if (categoryName == null) {
 				categoryName = LoggingCategoryName;
 			}
+			// config can be null
 
-			// initialize members
-			this.logger = loggerFactory.CreateLogger(categoryName);
-			this.runningTaskMonitor = CreateRunningTaskMonitor(config);
-			InitializeThisClassLevel(config);
+			// prepare parameters
+			ILogger logger = loggerFactory.CreateLogger(categoryName);
+			Func<IRunningContext, IRunningTaskTable> runningTaskTableCreator = GetRunningTaskTableCreator(config);
+
+			return new ZafuEnvironment(logger, runningTaskTableCreator, config);
 		}
 
-		public ZafuEnvironment(IConfigurationSection? config = null) {
-			// initialize members
-			this.relayingLogger = CreateRelayingLogger(config);
-			this.logger = this.relayingLogger;
-			this.runningTaskMonitor = CreateRunningTaskMonitor(config);
-			InitializeThisClassLevel(config);
+		public static ZafuEnvironment Create(IConfigurationSection? config = null) {
+			// check arguments
+			// config can be null
+
+			// prepare parameters
+			RelayingLogger relayingLogger = CreateRelayingLogger(config);
+			Func<IRunningContext, IRunningTaskTable> runningTaskTableCreator = GetRunningTaskTableCreator(config);
+
+			return new ZafuEnvironment(relayingLogger, runningTaskTableCreator, config);
 		}
 
-		private RunningTaskTable CreateRunningTaskMonitor(IConfigurationSection? config) {
-			return new RunningTaskTable(this);
+		private static Func<IRunningContext, IRunningTaskTable> GetRunningTaskTableCreator(IConfigurationSection? config) {
+			return (runningContext) => {
+				return new RunningTaskTable(runningContext);
+			};
 		}
 
-		private RelayingLogger CreateRelayingLogger(IConfigurationSection? config) {
+		private static RelayingLogger CreateRelayingLogger(IConfigurationSection? config) {
 			// TODO: support QueuedLogger
 			return new RelayingLogger();
 		}
@@ -147,7 +119,7 @@ namespace Zafu {
 			// config can be null
 
 			// initialize members
-			if (this.logger is NullLogger) {
+			if (this.Logger is NullLogger) {
 				// no need to log
 				this.LoggingLevel = LogLevel.None;
 			} else {
@@ -156,47 +128,16 @@ namespace Zafu {
 		}
 
 
-		public void Dispose() {
-			Dispose(this.DisposeWaitingTimeout, this.DisposeCancelingTimeout);
-		}
-
-		public bool Dispose(TimeSpan waitingTimeout, TimeSpan cancelingTimeOut) {
-			// check state
-			lock (this.instanceLocker) {
-				if (this.disposed) {
-					return true;
-				} else {
-					this.disposed = true;
-				}
-			}
-
-			return DisposeImpl(waitingTimeout, cancelingTimeOut);
-		}
-
-		protected virtual bool DisposeImpl(TimeSpan waitingTimeout, TimeSpan cancelingTimeOut) {
-			// wait for tasks in the task monitor
-			bool completed = this.runningTaskMonitor.Dispose(waitingTimeout, cancelingTimeOut);
+		protected override bool DisposeImpl(TimeSpan waitingTimeout, TimeSpan cancelingTimeOut) {
+			bool completed = base.DisposeImpl(waitingTimeout, cancelingTimeOut);
 
 			lock (this.instanceLocker) {
 				// clear logger
-				this.LoggingLevel = LogLevel.None;
-				this.logger = NullLogger.Instance;
 				this.relayingLogger = null;
 			}
 
 			return completed;
 		}
-
-		#endregion
-
-
-		#region IRunningContext
-
-		public ILogger Logger => this.logger;
-
-		public IRunningTaskMonitor RunningTaskMonitor => this.runningTaskMonitor;
-
-		// LoggingLevel is defined as a property with get/set accessor.
 
 		#endregion
 
@@ -244,7 +185,7 @@ namespace Zafu {
 
 
 		public static DefaultZafuEnvironmentScope InitializeDefaultEnvironment(out bool newlyCreated, ILogger logger, IConfigurationSection? config = null) {
-			return InitializeDefaultEnvironment(out newlyCreated, () => new ZafuEnvironment(logger, config));
+			return InitializeDefaultEnvironment(out newlyCreated, () => ZafuEnvironment.Create(logger, config));
 		}
 
 		public static DefaultZafuEnvironmentScope InitializeDefaultEnvironment(ILogger logger, IConfigurationSection? config = null) {
@@ -253,7 +194,7 @@ namespace Zafu {
 		}
 
 		public static DefaultZafuEnvironmentScope InitializeDefaultEnvironment(out bool newlyCreated, ILoggerFactory loggerFactory, IConfigurationSection? config = null) {
-			return InitializeDefaultEnvironment(out newlyCreated, () => new ZafuEnvironment(loggerFactory, null, config));
+			return InitializeDefaultEnvironment(out newlyCreated, () => ZafuEnvironment.Create(loggerFactory, null, config));
 		}
 
 		public static DefaultZafuEnvironmentScope InitializeDefaultEnvironment(ILoggerFactory loggerFactory, IConfigurationSection? config = null) {
@@ -262,7 +203,7 @@ namespace Zafu {
 		}
 
 		public static DefaultZafuEnvironmentScope InitializeDefaultEnvironment(out bool newlyCreated, IConfigurationSection? config = null) {
-			return InitializeDefaultEnvironment(out newlyCreated, () => new ZafuEnvironment(config));
+			return InitializeDefaultEnvironment(out newlyCreated, () => ZafuEnvironment.Create(config));
 		}
 
 		public static DefaultZafuEnvironmentScope InitializeDefaultEnvironment(IConfigurationSection? config = null) {
