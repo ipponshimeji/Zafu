@@ -32,7 +32,7 @@ namespace Zafu {
 
 		private ILogger logger;
 
-		private readonly RunningTaskMonitor runningTaskMonitor;
+		private readonly RunningTaskTable runningTaskMonitor;
 
 		private RelayingLogger? relayingLogger = null;
 
@@ -133,8 +133,8 @@ namespace Zafu {
 			InitializeThisClassLevel(config);
 		}
 
-		private RunningTaskMonitor CreateRunningTaskMonitor(IConfigurationSection? config) {
-			return new RunningTaskMonitor(this);
+		private RunningTaskTable CreateRunningTaskMonitor(IConfigurationSection? config) {
+			return new RunningTaskTable(this);
 		}
 
 		private RelayingLogger CreateRelayingLogger(IConfigurationSection? config) {

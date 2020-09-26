@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using Zafu.ObjectModel;
 
 namespace Zafu.Tasks {
-	public class RunningTaskMonitor: DisposableObject, IRunningTaskTable, IRunningTaskMonitor {
+	public class RunningTaskTable: DisposableObject, IRunningTaskTable, IRunningTaskMonitor {
 		#region types
 
 		public class RunningTask: IRunningTask {
@@ -167,10 +167,10 @@ namespace Zafu.Tasks {
 
 		#region creation & disposable
 
-		public RunningTaskMonitor(string? name, IRunningContext? runningContext = null): base(null, name, runningContext) {
+		public RunningTaskTable(string? name, IRunningContext? runningContext = null): base(null, name, runningContext) {
 		}
 
-		public RunningTaskMonitor(IRunningContext? runningContext = null) : base(null, DefaultName, runningContext) {
+		public RunningTaskTable(IRunningContext? runningContext = null) : base(null, DefaultName, runningContext) {
 		}
 
 		protected override void Dispose(bool disposing) {

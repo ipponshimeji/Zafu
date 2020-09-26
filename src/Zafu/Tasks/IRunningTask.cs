@@ -5,7 +5,7 @@ using Zafu.ObjectModel;
 namespace Zafu.Tasks {
 	/// <summary>
 	/// The interface to bridge some metods of <see cref="System.Threading.CancellationTokenSource"/> object.
-	/// This interface is used in <see cref="RunningTaskMonitor"/>.
+	/// This interface is used in <see cref="RunningTaskTable"/>.
 	/// </summary>
 	public interface IRunningTask {
 		int Id { get; }
