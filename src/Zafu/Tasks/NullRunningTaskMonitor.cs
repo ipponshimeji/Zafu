@@ -21,19 +21,19 @@ namespace Zafu.Tasks {
 
 		#region IRunningTaskMonitor
 
-		public ITaskCanceler MonitorTask(Action<CancellationToken> action) {
+		public IRunningTask MonitorTask(Action<CancellationToken> action) {
 			throw new NotImplementedException();
 		}
 
-		public void MonitorTask(Action action) {
+		public IRunningTask MonitorTask(Action action) {
 			throw new NotImplementedException();
 		}
 
-		public ITaskCanceler MonitorTask(Task task, CancellationTokenSource? cancellationTokenSource = null, bool dontDisposeCancellationTokenSource = false) {
+		public IRunningTask? MonitorTask(Task task, CancellationTokenSource? cancellationTokenSource = null, bool dontDisposeCancellationTokenSource = false) {
 			throw new NotImplementedException();
 		}
 
-		public ITaskCanceler MonitorTask(ValueTask task, CancellationTokenSource? cancellationTokenSource = null, bool dontDisposeCancellationTokenSource = false) {
+		public IRunningTask? MonitorTask(ValueTask task, CancellationTokenSource? cancellationTokenSource = null, bool dontDisposeCancellationTokenSource = false) {
 			throw new NotImplementedException();
 		}
 

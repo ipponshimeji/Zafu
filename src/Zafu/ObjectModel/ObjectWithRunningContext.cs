@@ -32,6 +32,8 @@ namespace Zafu.ObjectModel {
 
 		protected ILogger Logger => this.RunningContext.Logger;
 
+		protected LogLevel LoggingLevel => this.RunningContext.LoggingLevel;
+
 		public string Name {
 			get {
 				return this.name;
