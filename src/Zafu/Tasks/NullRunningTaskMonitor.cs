@@ -33,27 +33,6 @@ namespace Zafu.Tasks {
 
 		#region IRunningTaskMonitor
 
-		public IRunningTask MonitorTask(Action<CancellationToken> action) {
-			// check argument
-			if (action == null) {
-				throw new ArgumentNullException(nameof(action));
-			}
-
-			// create a RunningTask object for the action
-			RunningTask runningTask = RunningTask.Create((RunningTask rt, CancellationToken ct) => {
-				Debug.Assert(rt != null);
-				action(ct);
-			});
-			try {
-				// start the task
-				runningTask.Task.Start();
-				return runningTask;
-			} catch {
-				runningTask.DisposeCancellationTokenSource();
-				throw;
-			}
-		}
-
 		public IRunningTask MonitorTask(Action action) {
 			// check argument
 			if (action == null) {
@@ -65,6 +44,27 @@ namespace Zafu.Tasks {
 				Debug.Assert(rt != null);
 				action();
 			});
+			try {
+				// start the task
+				runningTask.Task.Start();
+				return runningTask;
+			} catch {
+				runningTask.DisposeCancellationTokenSource();
+				throw;
+			}
+		}
+
+		public IRunningTask MonitorTask(Action<CancellationToken> action, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false) {
+			// check argument
+			if (action == null) {
+				throw new ArgumentNullException(nameof(action));
+			}
+
+			// create a RunningTask object for the action
+			RunningTask runningTask = RunningTask.Create((RunningTask rt, CancellationToken ct) => {
+				Debug.Assert(rt != null);
+				action(ct);
+			}, cancellationTokenSource, doNotDisposeCancellationTokenSource);
 			try {
 				// start the task
 				runningTask.Task.Start();

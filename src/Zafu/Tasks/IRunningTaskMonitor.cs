@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 
 namespace Zafu.Tasks {
 	public interface IRunningTaskMonitor {
-		IRunningTask MonitorTask(Action<CancellationToken> action);
-
 		IRunningTask MonitorTask(Action action);
+
+		IRunningTask MonitorTask(Action<CancellationToken> action, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false);
 
 		IRunningTask? MonitorTask(Task task, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false);
 

@@ -7,12 +7,7 @@ namespace Zafu.Tasks {
 	public class RunningTask: IRunningTask {
 		#region data
 
-		private static int lastId = 0;
-
-
 		private readonly object instanceLocker = new object();
-
-		private readonly int id;
 
 		private readonly Task task;
 
@@ -43,18 +38,23 @@ namespace Zafu.Tasks {
 			// cancellationTokenSource can be null
 
 			// initialize members
-			this.id = Interlocked.Increment(ref lastId);
 			this.task = task;
 			this.cancellationTokenSource = cancellationTokenSource;
 			this.doNotDisposeCancellationTokenSource = doNotDisposeCancellationTokenSource;
 			Debug.Assert(this.isCancellationRequestedEmulator == false);
 		}
 
-		public static RunningTask Create(Action<RunningTask, CancellationToken> action) {
-			CancellationTokenSource cts = new CancellationTokenSource();
-			try {
+		public static RunningTask Create(Action<RunningTask, CancellationToken> action, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
+			// check arguments
+			if (action == null) {
+				throw new ArgumentNullException(nameof(action));
+			}
+			// cancellationTokenSource can be null
+
+			// create a RunningTask instance
+			if (cancellationTokenSource != null) {
 				RunningTask? runningTask = null;
-				CancellationToken cancellationToken = cts.Token;
+				CancellationToken cancellationToken = cancellationTokenSource.Token;
 				Task task = new Task(() => {
 					Debug.Assert(runningTask != null);
 					try {
@@ -65,17 +65,28 @@ namespace Zafu.Tasks {
 				}, cancellationToken);
 
 				// Note that the runningTask variable is referenced in the lambda above.
-				runningTask = new RunningTask(task, cancellationTokenSource: cts, doNotDisposeCancellationTokenSource: false);
+				runningTask = new RunningTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource);
 				return runningTask;
-			} catch {
-				cts.Dispose();
-				throw;
+			} else {
+				// create a CancellationTokenSource automatically
+				CancellationTokenSource cts = new CancellationTokenSource();
+				try {
+					return Create(action, cts, false);
+				} catch {
+					cts.Dispose();
+					throw;
+				}
 			}
 		}
 
 		public static RunningTask Create(Action<RunningTask> action, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false) {
+			// check arguments
+			if (action == null) {
+				throw new ArgumentNullException(nameof(action));
+			}
+			// cancellationTokenSource can be null
+
 			RunningTask? runningTask = null;
-			CancellationToken cancellationToken = (cancellationTokenSource != null) ? cancellationTokenSource.Token : CancellationToken.None;
 			Task task = new Task(() => {
 				Debug.Assert(runningTask != null);
 				try {
@@ -113,8 +124,6 @@ namespace Zafu.Tasks {
 
 
 		#region IRunningTask
-
-		public int Id => this.id;
 
 		public Task Task => this.task;
 

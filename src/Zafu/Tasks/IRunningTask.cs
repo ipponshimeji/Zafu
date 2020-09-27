@@ -8,7 +8,6 @@ namespace Zafu.Tasks {
 	/// This interface is used in <see cref="RunningTaskTable"/>.
 	/// </summary>
 	public interface IRunningTask {
-		int Id { get; }
 		Task Task { get; }
 		bool IsCancellationRequested { get; }
 		void Cancel();

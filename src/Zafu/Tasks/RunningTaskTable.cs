@@ -103,33 +103,6 @@ namespace Zafu.Tasks {
 
 		#region IRunningTaskMonitor
 
-		public virtual IRunningTask MonitorTask(Action<CancellationToken> action) {
-			// check argument
-			if (action == null) {
-				throw new ArgumentNullException(nameof(action));
-			}
-
-			// create a RunningTask object for the action
-			RunningTask runningTask = RunningTask.Create((RunningTask rt, CancellationToken ct) => {
-				Debug.Assert(rt != null);
-				try {
-					action(ct);
-				} catch (Exception exception) {
-					OnTaskException(rt, exception);
-					throw;
-				} finally {
-					UnregisterRunningTask(rt);
-				}
-			});
-			try {
-				// register the task to the running task table and start it
-				return RegisterRunningTaskAndStart(runningTask);
-			} catch {
-				runningTask.DisposeCancellationTokenSource();
-				throw;
-			}
-		}
-
 		public virtual IRunningTask MonitorTask(Action action) {
 			// check argument
 			if (action == null) {
@@ -148,6 +121,33 @@ namespace Zafu.Tasks {
 					UnregisterRunningTask(rt);
 				}
 			});
+			try {
+				// register the task to the running task table and start it
+				return RegisterRunningTaskAndStart(runningTask);
+			} catch {
+				runningTask.DisposeCancellationTokenSource();
+				throw;
+			}
+		}
+
+		public virtual IRunningTask MonitorTask(Action<CancellationToken> action, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false) {
+			// check argument
+			if (action == null) {
+				throw new ArgumentNullException(nameof(action));
+			}
+
+			// create a RunningTask object for the action
+			RunningTask runningTask = RunningTask.Create((RunningTask rt, CancellationToken ct) => {
+				Debug.Assert(rt != null);
+				try {
+					action(ct);
+				} catch (Exception exception) {
+					OnTaskException(rt, exception);
+					throw;
+				} finally {
+					UnregisterRunningTask(rt);
+				}
+			}, cancellationTokenSource, doNotDisposeCancellationTokenSource);
 			try {
 				// register the task to the running task table and start it
 				return RegisterRunningTaskAndStart(runningTask);
@@ -202,7 +202,7 @@ namespace Zafu.Tasks {
 			}
 
 			// log
-			Log<int>(logLevel, message, "id", runningTask.Id, exception, default(EventId));
+			Log<int>(logLevel, message, "task-id", runningTask.Task.Id, exception, default(EventId));
 		}
 
 		#endregion
