@@ -36,10 +36,10 @@ namespace Zafu.Tasks {
 
 		#region creation & disposable
 
-		public RunningTaskTable(string? name, IRunningContext? runningContext = null): base(null, name, runningContext) {
+		public RunningTaskTable(IRunningContext? runningContext = null, string? name = null) : base(runningContext, null, name) {
 		}
 
-		public RunningTaskTable(IRunningContext? runningContext = null) : base(null, DefaultName, runningContext) {
+		public RunningTaskTable(IRunningContext? runningContext = null) : base(runningContext, null, DefaultName) {
 		}
 
 		protected override void Dispose(bool disposing) {

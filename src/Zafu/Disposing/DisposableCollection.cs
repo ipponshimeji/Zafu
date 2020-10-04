@@ -6,7 +6,7 @@ using Zafu.ObjectModel;
 
 namespace Zafu.Disposing {
 
-	public class DisposableCollection: DisposableObject, ICollection<IDisposable> {
+	public class DisposableCollection<TRunningContext>: DisposableObject<TRunningContext>, ICollection<IDisposable> where TRunningContext: class, IRunningContext {
 		#region data
 
 		private List<IDisposable>? disposables;
@@ -16,7 +16,7 @@ namespace Zafu.Disposing {
 
 		#region creation & disposal
 
-		private DisposableCollection(List<IDisposable> disposables, string? name, IRunningContext? runningContext): base(null, name, runningContext) {
+		private DisposableCollection(TRunningContext runningContext, List<IDisposable> disposables, string? name): base(runningContext, null, name) {
 			// check argument
 			Debug.Assert(disposables != null);
 
@@ -24,20 +24,17 @@ namespace Zafu.Disposing {
 			this.disposables = disposables;
 		}
 
-		public DisposableCollection(IEnumerable<IDisposable> disposables, string? name, IRunningContext? runningContext = null) : this(new List<IDisposable>(disposables), name, runningContext) {
+		public DisposableCollection(TRunningContext runningContext, IEnumerable<IDisposable> disposables, string? name = null) : this(runningContext, new List<IDisposable>(disposables), name) {
 		}
 
-		public DisposableCollection(int capacity, string? name, IRunningContext? runningContext = null) : this(new List<IDisposable>(capacity), name, runningContext) {
+		public DisposableCollection(TRunningContext runningContext, int capacity, string? name = null) : this(runningContext, new List<IDisposable>(capacity), name) {
 		}
 
-		public DisposableCollection(string? name, IRunningContext? runningContext = null) : this(new List<IDisposable>(), name, runningContext) {
+		public DisposableCollection(TRunningContext runningContext, string? name = null) : this(runningContext, new List<IDisposable>(), name) {
 		}
 
 		protected override void Dispose(bool disposing) {
-			List<IDisposable>? value = this.disposables;
-			if (value != null) {
-				DisposingUtil.DisposeLoggingException(value, this.RunningContext);
-			}
+			DisposingUtil.ClearDisposablesLoggingException(ref this.disposables, this.RunningContext);
 		}
 
 		#endregion
@@ -128,6 +125,32 @@ namespace Zafu.Disposing {
 			}
 
 			return disposables;
+		}
+
+
+		// expose RunUnderInstanceLock() methods as public
+
+		public new void RunUnderInstanceLock(Action action) {
+			base.RunUnderInstanceLock(action);
+		}
+
+		public new T RunUnderInstanceLock<T>(Func<T> func) {
+			return base.RunUnderInstanceLock<T>(func);
+		}
+
+		#endregion
+	}
+
+	public class DisposableCollection: DisposableCollection<IRunningContext> {
+		#region creation & disposal
+
+		public DisposableCollection(IRunningContext? runningContext, IEnumerable<IDisposable> disposables, string? name = null) : base(IRunningContext.CorrectWithDefault(runningContext), disposables, name) {
+		}
+
+		public DisposableCollection(IRunningContext? runningContext, int capacity, string? name = null) : base(IRunningContext.CorrectWithDefault(runningContext), capacity, name) {
+		}
+
+		public DisposableCollection(IRunningContext? runningContext, string? name = null) : base(IRunningContext.CorrectWithDefault(runningContext), name) {
 		}
 
 		#endregion

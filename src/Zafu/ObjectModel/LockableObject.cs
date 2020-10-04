@@ -1,7 +1,7 @@
 ﻿using System;
 
 namespace Zafu.ObjectModel {
-	public class LockableObject: ObjectWithRunningContext {
+	public class LockableObject<TRunningContext>: ObjectWithRunningContext<TRunningContext> where TRunningContext: class, IRunningContext {
 		#region data
 
 		private readonly object instanceLocker;
@@ -22,13 +22,13 @@ namespace Zafu.ObjectModel {
 
 		#region creation
 
-		public LockableObject(object? instanceLocker = null, string? name = null, IRunningContext? runningContext = null): base(name, runningContext) {
+		public LockableObject(TRunningContext runningContext, object? instanceLocker): base(runningContext) {
 			// check argument
 			if (instanceLocker == null) {
 				instanceLocker = new object();
 			}
 
-			// initialize members
+			// initialize member
 			this.instanceLocker = instanceLocker;
 		}
 
@@ -47,6 +47,16 @@ namespace Zafu.ObjectModel {
 			lock (this.instanceLocker) {
 				return func();
 			}
+		}
+
+		#endregion
+	}
+
+
+	public class LockableObject: LockableObject<IRunningContext> {
+		#region creation
+
+		public LockableObject(IRunningContext? runningContext, object? instanceLocker) : base(IRunningContext.CorrectWithDefault(runningContext), instanceLocker) {
 		}
 
 		#endregion

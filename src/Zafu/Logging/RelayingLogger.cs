@@ -7,10 +7,10 @@ using Zafu.Disposing;
 using Zafu.ObjectModel;
 
 namespace Zafu.Logging {
-	public class RelayingLogger: LockableObject, ILogger {
+	public class RelayingLogger: NamableObject, ILogger {
 		#region types
 
-		public new class Use: LockableObject.Use {
+		public class NameUse: StandardNameUse {
 			public static readonly object Scope = new object();
 		}
 
@@ -26,7 +26,7 @@ namespace Zafu.Logging {
 
 		#region creation
 
-		public RelayingLogger(string? name = null, IRunningContext? runningContext = null): base(null, name, runningContext) {
+		public RelayingLogger(IRunningContext? runningContext = null, string? name = null) : base(runningContext, null, name) {
 		}
 
 		#endregion
@@ -85,8 +85,8 @@ namespace Zafu.Logging {
 		#region overrides
 
 		protected override string? GetNameFor(object use) {
-			if (use == Use.Scope) {
-				return $"scope of {GetName(Use.Message)}";
+			if (use == NameUse.Scope) {
+				return $"scope of {GetName(NameUse.Message)}";
 			} else {
 				return base.GetNameFor(use);
 			}
@@ -114,7 +114,7 @@ namespace Zafu.Logging {
 			}
 
 			IDisposable[] targetScopes = loggers.Select(l => beginScope(l, state)).Where(d => d != null).ToArray()!;
-			return new DisposableCollection(targetScopes, GetName(Use.Scope), this.RunningContext);
+			return new DisposableCollection(this.RunningContext, targetScopes, GetName(NameUse.Scope));
 		}
 
 		/// <remarks>

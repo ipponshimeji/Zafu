@@ -5,7 +5,7 @@ using Zafu.Logging;
 
 
 namespace Zafu.ObjectModel {
-	public class DisposableObject: LockableObject, IDisposable {
+	public class DisposableObject<TRunningContext>: NamableObject<TRunningContext>, IDisposable where TRunningContext: class, IRunningContext {
 		#region data
 
 		private bool disposed = false;
@@ -26,7 +26,10 @@ namespace Zafu.ObjectModel {
 
 		#region creation
 
-		public DisposableObject(object? instanceLocker = null, string? name = null, IRunningContext? runningContext = null): base(instanceLocker, name, runningContext) {
+		public DisposableObject(TRunningContext runningContext, object? instanceLocker = null, string? name = null) : base(runningContext, instanceLocker, name) {
+		}
+
+		public DisposableObject(TRunningContext runningContext, string name) : base(runningContext, null, name) {
 		}
 
 		public void Dispose() {
@@ -58,13 +61,26 @@ namespace Zafu.ObjectModel {
 		#region methods
 
 		protected ObjectDisposedException CreateObjectDisposedException() {
-			return new ObjectDisposedException(GetName(Use.Message));
+			return new ObjectDisposedException(GetName(StandardNameUse.Message));
 		}
 
 		protected void EnsureNotDisposed() {
 			if (this.disposed) {
 				throw CreateObjectDisposedException();
 			}
+		}
+
+		#endregion
+	}
+
+
+	public class DisposableObject: DisposableObject<IRunningContext> {
+		#region creation
+
+		public DisposableObject(IRunningContext? runningContext = null, object? instanceLocker = null, string? name = null) : base(IRunningContext.CorrectWithDefault(runningContext), instanceLocker, name) {
+		}
+
+		public DisposableObject(IRunningContext? runningContext, string name) : this(runningContext, null, name) {
 		}
 
 		#endregion
