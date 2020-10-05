@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using Zafu.Tasks.Testing;
+using Zafu.Testing.Tasks;
 
 namespace Zafu.Tasks.Tests {
 	public class TaskUtilTest {
@@ -17,9 +17,9 @@ namespace Zafu.Tasks.Tests {
 
 				protected abstract T GetResult();
 
-				protected abstract TTask GetSimpleActionTask(TestAction sampleAction, CancellationToken cancellationToken, T result);
+				protected abstract TTask GetSimpleActionTask(TestingAction sampleAction, CancellationToken cancellationToken, T result);
 
-				protected abstract TTask GetPausableActionTask(PausableTestAction sampleAction, CancellationToken cancellationToken, T result);
+				protected abstract TTask GetPausableActionTask(PausableTestingAction sampleAction, CancellationToken cancellationToken, T result);
 
 				protected abstract TTarget GetTarget(TTask task);
 
@@ -30,20 +30,6 @@ namespace Zafu.Tasks.Tests {
 
 				#region methods
 
-				protected static void WaitForCompletion(Task task) {
-					// check arguments
-					if (task == null) {
-						throw new ArgumentNullException(nameof(task));
-					}
-
-					// wait for the task's completion suppressing AggregateException exception
-					try {
-						task.Wait();
-					} catch (AggregateException) {
-						// ignore the exception
-					}
-				}
-
 				/// <summary>
 				///  Calls <see cref="CallSync(TTarget, bool)"/> method on another thread and resume the task which the method is executing.
 				///  This method is used to run <see cref="CallSync(TTarget, bool)"/> to execute a pausing pausable action.
@@ -53,12 +39,12 @@ namespace Zafu.Tasks.Tests {
 				/// <param name="passThroughAggregateException"></param>
 				/// <param name="sampleAction"></param>
 				/// <returns></returns>
-				protected (T, Exception?) CallSyncOnAnotherThread(TTarget target, bool passThroughAggregateException, PausableTestAction sampleAction) {
+				protected (T, Exception?) CallSyncOnAnotherThread(TTarget target, bool passThroughAggregateException, PausableTestingAction sampleAction) {
 					// check argument
 					if (sampleAction == null) {
 						throw new ArgumentNullException(nameof(sampleAction));
 					}
-					if (sampleAction.Progress != PausableTestAction.Works.Started) {
+					if (sampleAction.Progress != PausableTestingAction.Works.Started) {
 						throw new ArgumentException("It should be at 'Started' progress.", nameof(sampleAction));
 					}
 
@@ -96,12 +82,12 @@ namespace Zafu.Tasks.Tests {
 
 				protected void Test_Done_Successful(Action<TTarget>? additionalAsserts = null) {
 					// arrange
-					TestAction sampleAction = new TestAction();
-					Debug.Assert(sampleAction.Progress == TestAction.Works.None);
+					TestingAction sampleAction = new TestingAction();
+					Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 					T result = GetResult();
 					TTask task = GetSimpleActionTask(sampleAction, CancellationToken.None, result);
-					task.Wait();
+					task.WaitForCompletion();
 					Debug.Assert(task.IsCompletedSuccessfully); // task has already finished
 
 					TTarget target = GetTarget(task);
@@ -112,7 +98,7 @@ namespace Zafu.Tasks.Tests {
 
 					// assert
 					// All works should be done.
-					Assert.Equal(TestAction.Works.All, sampleAction.Progress);
+					Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
 					Assert.Equal(result, actualResult);
 					if (additionalAsserts != null) {
 						additionalAsserts(target);
@@ -122,12 +108,12 @@ namespace Zafu.Tasks.Tests {
 				protected void Test_Done_Exception(bool passThroughAggregateException, Action<TTarget>? additionalAsserts = null) {
 					// arrange
 					Exception exception = new InvalidOperationException();
-					TestAction sampleAction = new TestAction(exception);
-					Debug.Assert(sampleAction.Progress == TestAction.Works.None);
+					TestingAction sampleAction = new TestingAction(exception);
+					Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 					T result = GetResult();
 					TTask task = GetSimpleActionTask(sampleAction, CancellationToken.None, result);
-					WaitForCompletion(task);
+					task.WaitForCompletion();
 					Debug.Assert(task.IsFaulted);   // task has already finished
 
 					TTarget target = GetTarget(task);
@@ -139,7 +125,7 @@ namespace Zafu.Tasks.Tests {
 
 					// assert
 					// Works.Worked should not be done due to the exception.
-					Assert.Equal(TestAction.Works.Terminated, sampleAction.Progress);
+					Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
 
 					Exception? actualException;
 					if (passThroughAggregateException) {
@@ -154,7 +140,7 @@ namespace Zafu.Tasks.Tests {
 					Assert.Equal(exception, actualException);
 					Debug.Assert(actualException != null);
 					// The source of the exception should not be one when it was rethrown but the original one. 
-					Assert.Equal(TestAction.ExceptionSourceMethod, actualException.TargetSite);
+					Assert.Equal(TestingAction.ExceptionSourceMethod, actualException.TargetSite);
 
 					if (additionalAsserts != null) {
 						additionalAsserts(target);
@@ -164,13 +150,13 @@ namespace Zafu.Tasks.Tests {
 				protected void Test_Done_CanceledWithException(bool passThroughAggregateException, Action<TTarget>? additionalAsserts = null) {
 					using (CancellationTokenSource cancellationTokenSource = new CancellationTokenSource()) {
 						// arrange
-						TestAction sampleAction = new TestAction(throwOnCancellation: true);
-						Debug.Assert(sampleAction.Progress == TestAction.Works.None);
+						TestingAction sampleAction = new TestingAction(throwOnCancellation: true);
+						Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 						cancellationTokenSource.Cancel();
 						T result = GetResult();
 						TTask task = GetSimpleActionTask(sampleAction, cancellationTokenSource.Token, result);
-						WaitForCompletion(task);
+						task.WaitForCompletion();
 						Debug.Assert(task.IsCanceled);   // task was canceled before it started
 
 						TTarget target = GetTarget(task);
@@ -182,7 +168,7 @@ namespace Zafu.Tasks.Tests {
 
 						// assert
 						// The task was canceled before it started.
-						Assert.Equal(TestAction.Works.None, sampleAction.Progress);
+						Assert.Equal(TestingAction.Works.None, sampleAction.Progress);
 
 						Exception? actualException;
 						if (passThroughAggregateException) {
@@ -194,7 +180,7 @@ namespace Zafu.Tasks.Tests {
 							// capturedException should be the unwrapped exception
 							actualException = capturedException;
 						}
-						Assert.IsType<TaskCanceledException>(actualException);
+						Assert.IsAssignableFrom<OperationCanceledException>(actualException);
 
 						if (additionalAsserts != null) {
 							additionalAsserts(target);
@@ -204,26 +190,26 @@ namespace Zafu.Tasks.Tests {
 
 				protected void Test_Running_Successful(Action<TTarget>? additionalAsserts = null) {
 					// arrange
-					PausableTestAction sampleAction = new PausableTestAction();
-					Debug.Assert(sampleAction.Progress == TestAction.Works.None);
+					PausableTestingAction sampleAction = new PausableTestingAction();
+					Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 					T result = GetResult();
 					TTask task = GetPausableActionTask(sampleAction, CancellationToken.None, result);
 					// The task should not finish at this point.
 					sampleAction.WaitForPause();
-					Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
+					Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
 
 					TTarget target = GetTarget(task);
 					bool passThroughAggregateException = false;
 
 					// act
 					(T actualResult, Exception? actualException) = CallSyncOnAnotherThread(target, passThroughAggregateException, sampleAction);
-					WaitForCompletion(task);
+					task.WaitForCompletion();
 					Debug.Assert(task.IsCompleted);
 
 					// assert
 					// All works should be done.
-					Assert.Equal(TestAction.Works.All, sampleAction.Progress);
+					Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
 					Assert.Equal(result, actualResult);
 					Assert.Null(actualException);
 					if (additionalAsserts != null) {
@@ -234,25 +220,25 @@ namespace Zafu.Tasks.Tests {
 				protected void Test_Running_Exception(bool passThroughAggregateException, Action<TTarget>? additionalAsserts = null) {
 					// arrange
 					Exception exception = new NotSupportedException();
-					PausableTestAction sampleAction = new PausableTestAction(exception);
-					Debug.Assert(sampleAction.Progress == TestAction.Works.None);
+					PausableTestingAction sampleAction = new PausableTestingAction(exception);
+					Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 					T result = GetResult();
 					TTask task = GetPausableActionTask(sampleAction, CancellationToken.None, result);
 					// The task should not finish at this point.
 					sampleAction.WaitForPause();
-					Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
+					Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
 
 					TTarget target = GetTarget(task);
 
 					// act
 					(T actualResult, Exception? capturedException) = CallSyncOnAnotherThread(target, passThroughAggregateException, sampleAction);
-					WaitForCompletion(task);
+					task.WaitForCompletion();
 					Debug.Assert(task.IsCompleted);
 
 					// assert
 					// Works.Worked should not be done due to the exception.
-					Assert.Equal(TestAction.Works.Terminated, sampleAction.Progress);
+					Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
 
 					Exception? actualException;
 					if (passThroughAggregateException) {
@@ -267,7 +253,7 @@ namespace Zafu.Tasks.Tests {
 					Assert.Equal(exception, actualException);
 					Debug.Assert(actualException != null);
 					// The source of the exception should not be one when it was rethrown but the original one. 
-					Assert.Equal(TestAction.ExceptionSourceMethod, actualException.TargetSite);
+					Assert.Equal(TestingAction.ExceptionSourceMethod, actualException.TargetSite);
 
 					if (additionalAsserts != null) {
 						additionalAsserts(target);
@@ -277,26 +263,26 @@ namespace Zafu.Tasks.Tests {
 				protected void Test_Running_CanceledWithException(bool passThroughAggregateException, Action<TTarget>? additionalAsserts = null) {
 					using (CancellationTokenSource cancellationTokenSource = new CancellationTokenSource()) {
 						// arrange
-						PausableTestAction sampleAction = new PausableTestAction(throwOnCancellation: true);
-						Debug.Assert(sampleAction.Progress == TestAction.Works.None);
+						PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: true);
+						Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 						T result = GetResult();
 						TTask task = GetPausableActionTask(sampleAction, cancellationTokenSource.Token, result);
 						// The task should not finish at this point.
 						sampleAction.WaitForPause();
-						Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
+						Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
 
 						TTarget target = GetTarget(task);
 
 						// act
 						cancellationTokenSource.Cancel();
 						(T actualResult, Exception? capturedException) = CallSyncOnAnotherThread(target, passThroughAggregateException, sampleAction);
-						WaitForCompletion(task);
+						task.WaitForCompletion();
 						Debug.Assert(task.IsCompleted);
 
 						// assert
 						// Works.Worked should not be done due to the cancellation.
-						Assert.Equal(TestAction.Works.Terminated, sampleAction.Progress);
+						Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
 
 						Exception? actualException;
 						if (passThroughAggregateException) {
@@ -308,7 +294,7 @@ namespace Zafu.Tasks.Tests {
 							// capturedException should be an unwrapped exception
 							actualException = capturedException;
 						}
-						Assert.IsType<TaskCanceledException>(actualException);
+						Assert.IsAssignableFrom<OperationCanceledException>(actualException);
 
 						if (additionalAsserts != null) {
 							additionalAsserts(target);
@@ -319,26 +305,26 @@ namespace Zafu.Tasks.Tests {
 				protected void Test_Running_CanceledVoluntary(Action<TTarget>? additionalAsserts = null) {
 					using (CancellationTokenSource cancellationTokenSource = new CancellationTokenSource()) {
 						// arrange
-						PausableTestAction sampleAction = new PausableTestAction(throwOnCancellation: false);
-						Debug.Assert(sampleAction.Progress == TestAction.Works.None);
+						PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: false);
+						Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 						T result = GetResult();
 						TTask task = GetPausableActionTask(sampleAction, cancellationTokenSource.Token, result);
 						// The task should not finish at this point.
 						sampleAction.WaitForPause();
-						Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
+						Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
 
 						TTarget target = GetTarget(task);
 
 						// act
 						cancellationTokenSource.Cancel();
 						(T actualResult, Exception? capturedException) = CallSyncOnAnotherThread(target, false, sampleAction);
-						WaitForCompletion(task);
+						task.WaitForCompletion();
 						Debug.Assert(task.IsCompleted);
 
 						// assert
 						// Works.Worked should not be done due to the cancellation.
-						Assert.Equal(TestAction.Works.Terminated, sampleAction.Progress);
+						Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
 						Assert.Equal(result, actualResult);
 						if (additionalAsserts != null) {
 							additionalAsserts(target);
@@ -358,7 +344,7 @@ namespace Zafu.Tasks.Tests {
 					return default(ValueTuple);
 				}
 
-				protected override Task GetSimpleActionTask(TestAction sampleAction, CancellationToken cancellationToken, ValueTuple result) {
+				protected override Task GetSimpleActionTask(TestingAction sampleAction, CancellationToken cancellationToken, ValueTuple result) {
 					// check argument
 					Debug.Assert(sampleAction != null);
 					// ignore the 'result' argument
@@ -366,7 +352,7 @@ namespace Zafu.Tasks.Tests {
 					return sampleAction.GetSimpleActionTask(cancellationToken);
 				}
 
-				protected override Task GetPausableActionTask(PausableTestAction sampleAction, CancellationToken cancellationToken, ValueTuple result) {
+				protected override Task GetPausableActionTask(PausableTestingAction sampleAction, CancellationToken cancellationToken, ValueTuple result) {
 					// check argument
 					Debug.Assert(sampleAction != null);
 					// ignore the 'result' argument
@@ -380,14 +366,14 @@ namespace Zafu.Tasks.Tests {
 			public abstract class Sync_TaskT<T>: SyncTestBase<Task<T>, Task<T>, T> {
 				#region overrides
 
-				protected override Task<T> GetSimpleActionTask(TestAction sampleAction, CancellationToken cancellationToken, T result) {
+				protected override Task<T> GetSimpleActionTask(TestingAction sampleAction, CancellationToken cancellationToken, T result) {
 					// check argument
 					Debug.Assert(sampleAction != null);
 
 					return sampleAction.GetSimpleActionTask<T>(cancellationToken, result);
 				}
 
-				protected override Task<T> GetPausableActionTask(PausableTestAction sampleAction, CancellationToken cancellationToken, T result) {
+				protected override Task<T> GetPausableActionTask(PausableTestingAction sampleAction, CancellationToken cancellationToken, T result) {
 					// check argument
 					Debug.Assert(sampleAction != null);
 
@@ -506,14 +492,14 @@ namespace Zafu.Tasks.Tests {
 			public abstract class Sync_ValueTaskT<T>: SyncTestBase<ValueTask<T>, Task<T>, T> {
 				#region overrides
 
-				protected override Task<T> GetSimpleActionTask(TestAction sampleAction, CancellationToken cancellationToken, T result) {
+				protected override Task<T> GetSimpleActionTask(TestingAction sampleAction, CancellationToken cancellationToken, T result) {
 					// check argument
 					Debug.Assert(sampleAction != null);
 
 					return sampleAction.GetSimpleActionTask<T>(cancellationToken, result);
 				}
 
-				protected override Task<T> GetPausableActionTask(PausableTestAction sampleAction, CancellationToken cancellationToken, T result) {
+				protected override Task<T> GetPausableActionTask(PausableTestingAction sampleAction, CancellationToken cancellationToken, T result) {
 					// check argument
 					Debug.Assert(sampleAction != null);
 

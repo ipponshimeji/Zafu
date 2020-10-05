@@ -2,12 +2,15 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Zafu.ObjectModel;
 
 namespace Zafu.Tasks {
-	public class RunningTask: IRunningTask {
+	public class RunningTask: ObjectWithRunningContext, IRunningTask {
 		#region data
 
 		private readonly object instanceLocker = new object();
+
+		private readonly Action<RunningTask> action;
 
 		private readonly Task task;
 
@@ -28,77 +31,45 @@ namespace Zafu.Tasks {
 		#endregion
 
 
+		#region properties
+
+		public CancellationToken CancellationToken {
+			get {
+				CancellationTokenSource? cts = this.cancellationTokenSource;
+				return (cts != null) ? cts.Token : CancellationToken.None;
+			}
+		}
+
+		#endregion
+
+
 		#region creation & disposal
 
-		public RunningTask(Task task, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
+		public RunningTask(IRunningContext? runningContext, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, Action<RunningTask> action) : base(IRunningContext.CorrectWithDefault(runningContext)) {
 			// check argument
-			if (task == null) {
-				throw new ArgumentNullException(nameof(task));
+			// runningContext can be null
+			if (action == null) {
+				throw new ArgumentNullException(nameof(action));
 			}
 			// cancellationTokenSource can be null
 
 			// initialize members
-			this.task = task;
+			this.action = action;
 			this.cancellationTokenSource = cancellationTokenSource;
 			this.doNotDisposeCancellationTokenSource = doNotDisposeCancellationTokenSource;
 			Debug.Assert(this.isCancellationRequestedEmulator == false);
-		}
 
-		public static RunningTask Create(Action<RunningTask, CancellationToken> action, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
-			// check arguments
-			if (action == null) {
-				throw new ArgumentNullException(nameof(action));
-			}
-			// cancellationTokenSource can be null
-
-			// create a RunningTask instance
-			if (cancellationTokenSource != null) {
-				RunningTask? runningTask = null;
-				CancellationToken cancellationToken = cancellationTokenSource.Token;
-				Task task = new Task(() => {
-					Debug.Assert(runningTask != null);
-					try {
-						action(runningTask, cancellationToken);
-					} finally {
-						runningTask.DisposeCancellationTokenSource();
-					}
-				}, cancellationToken);
-
-				// Note that the runningTask variable is referenced in the lambda above.
-				runningTask = new RunningTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource);
-				return runningTask;
-			} else {
-				// create a CancellationTokenSource automatically
-				CancellationTokenSource cts = new CancellationTokenSource();
-				try {
-					return Create(action, cts, false);
-				} catch {
-					cts.Dispose();
-					throw;
-				}
-			}
-		}
-
-		public static RunningTask Create(Action<RunningTask> action, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false) {
-			// check arguments
-			if (action == null) {
-				throw new ArgumentNullException(nameof(action));
-			}
-			// cancellationTokenSource can be null
-
-			RunningTask? runningTask = null;
-			Task task = new Task(() => {
+			static void proc(object? state) {
+				RunningTask? runningTask = state as RunningTask;
 				Debug.Assert(runningTask != null);
 				try {
-					action(runningTask);
+					runningTask.action(runningTask);
 				} finally {
 					runningTask.DisposeCancellationTokenSource();
 				}
-			});
-
-			// Note that the runningTask variable is referenced in the lambda above.
-			runningTask = new RunningTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource);
-			return runningTask;
+			}
+			CancellationToken cancellationToken = (cancellationTokenSource != null) ? cancellationTokenSource.Token : CancellationToken.None;
+			this.task = new Task(proc, this, cancellationToken);
 		}
 
 
@@ -179,6 +150,15 @@ namespace Zafu.Tasks {
 					this.isCancellationRequestedEmulator = true;
 				}
 			}
+		}
+
+		#endregion
+
+
+		#region methods
+
+		public void Start() {
+			this.task.Start();
 		}
 
 		#endregion

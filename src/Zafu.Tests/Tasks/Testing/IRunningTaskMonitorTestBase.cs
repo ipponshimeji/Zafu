@@ -1,46 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Zafu.Testing;
+using Zafu.Testing.Tasks;
 using Xunit;
 
 namespace Zafu.Tasks.Testing {
 	public abstract class IRunningTaskMonitorTestBase {
-		#region types
-
-		public class TestingCancellationTokenSource: CancellationTokenSource {
-			#region data
-
-			private int disposeCount = 0;
-
-			#endregion
-
-
-			#region properties
-
-			public int DisposeCount => this.disposeCount;
-
-			#endregion
-
-
-			#region creation & disposal
-
-			public TestingCancellationTokenSource(): base() {
-			}
-
-			protected override void Dispose(bool disposing) {
-				if (disposing) {
-					Interlocked.Increment(ref this.disposeCount);
-				}
-				base.Dispose(disposing);
-			}
-
-			#endregion
-		}
-
-		#endregion
-
-
 		#region overridables
 
 		protected abstract IRunningTaskMonitor CreateTarget();
@@ -48,9 +16,111 @@ namespace Zafu.Tasks.Testing {
 		#endregion
 
 
+		#region samples
+
+		public class SyncCallingPattern {
+			#region data
+
+			public readonly bool? DoNotDisposeCancellationTokenSource;
+
+			#endregion
+
+
+			#region creation
+
+			public SyncCallingPattern(bool? doNotDisposeCancellationTokenSource) {
+				// initialize member
+				this.DoNotDisposeCancellationTokenSource = doNotDisposeCancellationTokenSource;
+			}
+
+			#endregion
+
+
+			#region overrides
+
+			public override string ToString() {
+				if (this.DoNotDisposeCancellationTokenSource.HasValue) {
+					if (this.DoNotDisposeCancellationTokenSource.Value) {
+						return "cancellationTokenSource: non-null, doNotDisposeCancellationTokenSource: true";
+					} else {
+						return "cancellationTokenSource: non-null, doNotDisposeCancellationTokenSource: false";
+					}
+				} else {
+					return "cancellationTokenSource: null";
+				}
+			}
+
+			#endregion
+
+
+			#region methods
+
+			public void Test(Action<CancellationTokenSource?, bool> test) {
+				// check arbument
+				if (test == null) {
+					throw new ArgumentNullException(nameof(test));
+				}
+
+				if (this.DoNotDisposeCancellationTokenSource.HasValue) {
+					if (this.DoNotDisposeCancellationTokenSource.Value) {
+						// In this pattern,
+						//   * A CancellationTokenSource should be given to the test.
+						//   * But it should not be disposed by the test.
+						using (TestingCancellationTokenSource cancellationTokenSource = new TestingCancellationTokenSource()) {
+							Debug.Assert(cancellationTokenSource.DisposeCount == 0);
+
+							// test
+							test(cancellationTokenSource, true);
+
+							// assert additionally
+							// cancellationTokenSource should not be disposed
+							Assert.Equal(0, cancellationTokenSource.DisposeCount);
+						}
+					} else {
+						// In this pattern,
+						//   * A CancellationTokenSource should be given to the test.
+						//   * And it should be disposed by the test.
+						TestingCancellationTokenSource cancellationTokenSource = new TestingCancellationTokenSource();
+						Debug.Assert(cancellationTokenSource.DisposeCount == 0);
+
+						// test
+						test(cancellationTokenSource, false);
+
+						// assert additionally
+						// cancellationTokenSource should be disposed
+						Assert.Equal(1, cancellationTokenSource.DisposeCount);
+					}
+				} else {
+					// In this pattern,
+					//   * No CancellationTokenSource should be given to the test.
+					test(null, false);
+				}
+			}
+
+			#endregion
+		}
+
+		public static IEnumerable<SyncCallingPattern> GetSyncCallingPatterns() {
+			return new SyncCallingPattern[] {
+				// cancellationTokenSource: null
+				new SyncCallingPattern(null),
+				// cancellationTokenSource: non-null, doNotDisposeCancellationTokenSource: false
+				new SyncCallingPattern(false),
+				// cancellationTokenSource: non-null, doNotDisposeCancellationTokenSource: true
+				new SyncCallingPattern(true)
+			};
+		}
+
+		public static IEnumerable<object[]> GetSyncCallingPatternData() {
+			return GetSyncCallingPatterns().ToTestData();
+		}
+
+		#endregion
+
+
 		#region utilities
 
-		protected void AssertExceptionOnTask(Exception expectedException, Task task, bool nested = false) {
+		protected void AssertExceptionOnTask(Exception expectedException, Task task) {
 			// check argument
 			if (expectedException == null) {
 				throw new ArgumentNullException(nameof(expectedException));
@@ -65,15 +135,7 @@ namespace Zafu.Tasks.Testing {
 			Assert.NotNull(aggregateException);
 			Debug.Assert(aggregateException != null);
 			Assert.Single(aggregateException.InnerExceptions);
-			if (nested) {
-				AggregateException? nestedException = aggregateException.InnerException as AggregateException;
-				Assert.NotNull(nestedException);
-				Debug.Assert(nestedException != null);
-				Assert.Single(nestedException.InnerExceptions);
-				Assert.Equal(expectedException, nestedException.InnerException);
-			} else {
-				Assert.Equal(expectedException, aggregateException.InnerException);
-			}
+			Assert.Equal(expectedException, aggregateException.InnerException);
 		}
 
 		#endregion
@@ -82,12 +144,10 @@ namespace Zafu.Tasks.Testing {
 		#region tests
 
 		[Fact(DisplayName = "simple action; successful")]
-		public void simpleaction_successful() {
+		public void SimpleAction_Successful() {
 			// arrange
-			TestAction sampleAction = new TestAction();
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// All works should be done.
-			int expectedProgress = TestAction.Works.All;
+			TestingAction sampleAction = new TestingAction();
+			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 			IRunningTaskMonitor target = CreateTarget();
 			Action action = sampleAction.SimpleAction;
@@ -96,21 +156,20 @@ namespace Zafu.Tasks.Testing {
 			IRunningTask runningTask = target.MonitorTask(action);
 			Debug.Assert(runningTask != null);
 			Task actualTask = runningTask.Task;
-			actualTask.Wait();
+			actualTask.WaitForCompletion();
 
 			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
+			// All works should be done.
+			Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
 			Assert.True(actualTask.IsCompletedSuccessfully);
 		}
 
 		[Fact(DisplayName = "simple action; exception")]
-		public void simpleaction_exception() {
+		public void SimpleAction_Exception() {
 			// arrange
 			InvalidOperationException exception = new InvalidOperationException();
-			TestAction sampleAction = new TestAction(exception);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// Works.Worked should not be done due to the exception.
-			int expectedProgress = TestAction.Works.Terminated;
+			TestingAction sampleAction = new TestingAction(exception);
+			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 			IRunningTaskMonitor target = CreateTarget();
 			Action action = sampleAction.SimpleAction;
@@ -119,15 +178,40 @@ namespace Zafu.Tasks.Testing {
 			IRunningTask runningTask = target.MonitorTask(action);
 			Debug.Assert(runningTask != null);
 			Task actualTask = runningTask.Task;
-			Assert.Throws<AggregateException>(() => actualTask.Wait());
+			actualTask.WaitForCompletion();
 
 			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
+			// Works.Worked should not be done due to the exception.
+			Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
 			AssertExceptionOnTask(exception, actualTask);
 		}
 
+		[Fact(DisplayName = "simple action; try to cancel")]
+		public void SimpleAction_Cancel() {
+			// arrange
+			TestingAction sampleAction = new TestingAction();
+			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+
+			IRunningTaskMonitor target = CreateTarget();
+			Action action = sampleAction.SimpleAction;
+
+			// act
+			IRunningTask runningTask = target.MonitorTask(action);
+			Debug.Assert(runningTask != null);
+			// try to cancel, but it gives no effect
+			runningTask.Cancel();
+
+			Task actualTask = runningTask.Task;
+			actualTask.WaitForCompletion();
+
+			// assert
+			// All works should be done.
+			Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+			Assert.True(actualTask.IsCompletedSuccessfully);
+		}
+
 		[Fact(DisplayName = "simple action; action: null")]
-		public void simpleaction_action_null() {
+		public void SimpleAction_action_null() {
 			// arrange
 			IRunningTaskMonitor target = CreateTarget();
 			Action action = null!;
@@ -141,121 +225,66 @@ namespace Zafu.Tasks.Testing {
 			Assert.Equal("action", actual.ParamName);
 		}
 
-		[Fact(DisplayName = "cancellable action; successful")]
-		public void cancellableaction_successful() {
+		protected void Test_CancellableAction_Successful(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
 			// arrange
-			TestAction sampleAction = new TestAction();
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// All works should be done.
-			int expectedProgress = TestAction.Works.All;
+			TestingAction sampleAction = new TestingAction();
+			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 			IRunningTaskMonitor target = CreateTarget();
 			Action<CancellationToken> action = sampleAction.SimpleAction;
 
 			// act
-			IRunningTask runningTask = target.MonitorTask(action);
+			IRunningTask runningTask = target.MonitorTask(action, cancellationTokenSource, doNotDisposeCancellationTokenSource);
 			Debug.Assert(runningTask != null);
 			Task actualTask = runningTask.Task;
-			actualTask.Wait();
+			actualTask.WaitForCompletion();
 
 			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
+			// All works should be done.
+			Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
 			Assert.True(actualTask.IsCompletedSuccessfully);
 		}
 
-		[Fact(DisplayName = "cancellable action; exception")]
-		public void cancellableaction_exception() {
+		[Theory(DisplayName = "cancellable action; successful")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void CancellableAction_Successful(SyncCallingPattern pattern) {
+			pattern.Test(this.Test_CancellableAction_Successful);
+		}
+
+		public void Test_CancellableAction_Exception(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
 			// arrange
 			InvalidOperationException exception = new InvalidOperationException();
-			TestAction sampleAction = new TestAction(exception);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// Works.Worked should not be done due to the exception.
-			int expectedProgress = TestAction.Works.Terminated;
+			TestingAction sampleAction = new TestingAction(exception);
+			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 			IRunningTaskMonitor target = CreateTarget();
 			Action<CancellationToken> action = sampleAction.SimpleAction;
 
 			// act
-			IRunningTask runningTask = target.MonitorTask(action);
+			IRunningTask runningTask = target.MonitorTask(action, cancellationTokenSource, doNotDisposeCancellationTokenSource);
 			Debug.Assert(runningTask != null);
 			Task actualTask = runningTask.Task;
-			Assert.Throws<AggregateException>(() => actualTask.Wait());
+			actualTask.WaitForCompletion();
 
 			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
+			// Works.Worked should not be done due to the exception.
+			Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
 			AssertExceptionOnTask(exception, actualTask);
 		}
 
-		[Fact(DisplayName = "cancellable action; cancel; cancellationTokenSource: null")]
-		public void cancellableaction_cancel_cancellationTokenSource_null() {
-			// arrange
-			PausableTestAction sampleAction = new PausableTestAction(throwOnCancellation: false);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// Works.Worked should not be done due to the cancellation.
-			int expectedProgress = TestAction.Works.Terminated;
-
-			IRunningTaskMonitor target = CreateTarget();
-			Action<CancellationToken> action = sampleAction.PausableAction;
-
-			// act
-			IRunningTask runningTask = target.MonitorTask(action);
-			Debug.Assert(runningTask != null);
-			Task actualTask = runningTask.Task;
-
-			sampleAction.WaitForPause();
-			Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
-			runningTask.Cancel();
-			sampleAction.Resume();
-
-			actualTask.Wait();
-
-			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
-			Assert.True(actualTask.IsCompletedSuccessfully);
+		[Theory(DisplayName = "cancellable action; exception")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void CancellableAction_Exception(SyncCallingPattern pattern) {
+			pattern.Test(this.Test_CancellableAction_Exception);
 		}
 
-		[Fact(DisplayName = "cancellable action; cancel by exception; cancellationTokenSource: null")]
-		public void cancellableaction_cancel_by_exception_cancellationTokenSource_null() {
+		protected void Test_CancellableAction_Canceled(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
 			// arrange
-			PausableTestAction sampleAction = new PausableTestAction(throwOnCancellation: true);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// Works.Worked should not be done due to the cancellation.
-			int expectedProgress = TestAction.Works.Terminated;
+			PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: false);
+			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 			IRunningTaskMonitor target = CreateTarget();
 			Action<CancellationToken> action = sampleAction.PausableAction;
-
-			// act
-			IRunningTask runningTask = target.MonitorTask(action);
-			Debug.Assert(runningTask != null);
-			Task actualTask = runningTask.Task;
-
-			sampleAction.WaitForPause();
-			Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
-			runningTask.Cancel();
-			sampleAction.Resume();
-
-			AggregateException aggregateException = Assert.Throws<AggregateException>(() => actualTask.Wait());
-
-			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
-			Assert.True(actualTask.IsCanceled);
-			Assert.IsAssignableFrom<TaskCanceledException>(aggregateException.InnerException);
-		}
-
-		[Fact(DisplayName = "cancellable action; cancel by exception; cancellationTokenSource: non-null, doNotDisposeCancellationTokenSource: false")]
-		public void cancellableaction_cancel_by_exception_cancellationTokenSource_nonnull_doNotDisposeCancellationTokenSource_false() {
-			// arrange
-			PausableTestAction sampleAction = new PausableTestAction(throwOnCancellation: true);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// Works.Worked should not be done due to the cancellation.
-			int expectedProgress = TestAction.Works.Terminated;
-
-			IRunningTaskMonitor target = CreateTarget();
-			Action<CancellationToken> action = sampleAction.PausableAction;
-			TestingCancellationTokenSource cancellationTokenSource = new TestingCancellationTokenSource();
-			Debug.Assert(cancellationTokenSource.DisposeCount == 0);
-			bool doNotDisposeCancellationTokenSource = false;
 
 			// act
 			IRunningTask runningTask = target.MonitorTask(action, cancellationTokenSource, doNotDisposeCancellationTokenSource);
@@ -263,55 +292,62 @@ namespace Zafu.Tasks.Testing {
 			Task actualTask = runningTask.Task;
 
 			sampleAction.WaitForPause();
-			Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
+			Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
 			runningTask.Cancel();
 			sampleAction.Resume();
 
-			AggregateException aggregateException = Assert.Throws<AggregateException>(() => actualTask.Wait());
+			actualTask.WaitForCompletion();
 
 			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
-			Assert.True(actualTask.IsCanceled);
-			Assert.IsAssignableFrom<TaskCanceledException>(aggregateException.InnerException);
-			Assert.Equal(1, cancellationTokenSource.DisposeCount);
+			// Works.Worked should not be done due to the cancellation.
+			// Note that Cancel() works even if the cancellationTokenSource is null,
+			// because a CancellationTokenSource is created in Cancel() in that case.
+			Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+			Assert.True(actualTask.IsCompletedSuccessfully);
 		}
 
-		[Fact(DisplayName = "cancellable action; cancel by exception; cancellationTokenSource: non-null, doNotDisposeCancellationTokenSource: true")]
-		public void cancellableaction_cancel_by_exception_cancellationTokenSource_nonnull_doNotDisposeCancellationTokenSource_true() {
+		[Theory(DisplayName = "cancellable action; canceled")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void CancellableAction_Canceled(SyncCallingPattern pattern) {
+			pattern.Test(this.Test_CancellableAction_Canceled);
+		}
+
+		protected void Test_CancellableAction_CanceledWithException(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
 			// arrange
-			PausableTestAction sampleAction = new PausableTestAction(throwOnCancellation: true);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// Works.Worked should not be done due to the cancellation.
-			int expectedProgress = TestAction.Works.Terminated;
+			PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: true);
+			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 			IRunningTaskMonitor target = CreateTarget();
 			Action<CancellationToken> action = sampleAction.PausableAction;
-			using (TestingCancellationTokenSource cancellationTokenSource = new TestingCancellationTokenSource()) {
-				Debug.Assert(cancellationTokenSource.DisposeCount == 0);
-				bool doNotDisposeCancellationTokenSource = true;
 
-				// act
-				IRunningTask runningTask = target.MonitorTask(action, cancellationTokenSource, doNotDisposeCancellationTokenSource);
-				Debug.Assert(runningTask != null);
-				Task actualTask = runningTask.Task;
+			// act
+			IRunningTask runningTask = target.MonitorTask(action, cancellationTokenSource, doNotDisposeCancellationTokenSource);
+			Debug.Assert(runningTask != null);
+			Task actualTask = runningTask.Task;
 
-				sampleAction.WaitForPause();
-				Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
-				runningTask.Cancel();
-				sampleAction.Resume();
+			sampleAction.WaitForPause();
+			Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+			runningTask.Cancel();
+			sampleAction.Resume();
 
-				AggregateException aggregateException = Assert.Throws<AggregateException>(() => actualTask.Wait());
+			actualTask.WaitForCompletion();
 
-				// assert
-				Assert.Equal(expectedProgress, sampleAction.Progress);
-				Assert.True(actualTask.IsCanceled);
-				Assert.IsAssignableFrom<TaskCanceledException>(aggregateException.InnerException);
-				Assert.Equal(0, cancellationTokenSource.DisposeCount);
-			}
+			// assert
+			// Works.Worked should not be done due to the cancellation.
+			// Note that Cancel() works even if the cancellationTokenSource is null,
+			// because a CancellationTokenSource is created in Cancel() in that case.
+			Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+			Assert.True(actualTask.IsCanceled);
+		}
+
+		[Theory(DisplayName = "cancellable action; canceled with exception")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void CancellableAction_CanceledWithException(SyncCallingPattern pattern) {
+			pattern.Test(this.Test_CancellableAction_CanceledWithException);
 		}
 
 		[Fact(DisplayName = "cancellable action; action: null")]
-		public void cancellableaction_action_null() {
+		public void CancellableAction_action_null() {
 			// arrange
 			IRunningTaskMonitor target = CreateTarget();
 			Action<CancellationToken> action = null!;
@@ -325,224 +361,224 @@ namespace Zafu.Tasks.Testing {
 			Assert.Equal("action", actual.ParamName);
 		}
 
-		[Fact(DisplayName = "task; successful")]
-		public void task_successful() {
+		protected void Test_Task_Done_Successful(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask) {
 			// arrange
-			PausableTestAction sampleAction = new PausableTestAction(throwOnCancellation: false);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// All works should be done.
-			int expectedProgress = TestAction.Works.All;
-
 			IRunningTaskMonitor target = CreateTarget();
-			Task task = sampleAction.GetPausableActionTask(cancellationTokenSource: null);
-			sampleAction.WaitForPause();
-			Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
+			Task task = Task.FromResult(0);
+			Debug.Assert(task.IsCompletedSuccessfully);
 
 			// act
-			IRunningTask? runningTask = target.MonitorTask(task);
+			IRunningTask? runningTask = targetValueTask switch {
+				true => target.MonitorTask(new ValueTask(task), cancellationTokenSource, doNotDisposeCancellationTokenSource),
+				_ => target.MonitorTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource)
+			};
+
+			// assert
+			// No need to create a RunningTask because the task finished.
+			Assert.Null(runningTask);
+		}
+
+		[Theory(DisplayName = "Task; done; successful")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void Task_Done_Successful(SyncCallingPattern pattern) {
+			pattern.Test((cts, dndcts) => this.Test_Task_Done_Successful(cts, dndcts, targetValueTask: false));
+		}
+
+		[Theory(DisplayName = "ValueTask; done; successful")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void ValueTask_Done_Successful(SyncCallingPattern pattern) {
+			pattern.Test((cts, dndcts) => this.Test_Task_Done_Successful(cts, dndcts, targetValueTask: true));
+		}
+
+		protected void Test_Task_Done_Exception(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask) {
+			// arrange
+			IRunningTaskMonitor target = CreateTarget();
+			Exception exception = new NotImplementedException();
+			Task task = Task.FromException(exception);
+			Debug.Assert(task.IsFaulted);
+
+			// act
+			IRunningTask? runningTask = targetValueTask switch {
+				true => target.MonitorTask(new ValueTask(task), cancellationTokenSource, doNotDisposeCancellationTokenSource),
+				_ => target.MonitorTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource)
+			};
+
+			// assert
+			// No need to create a RunningTask because the task finished.
+			Assert.Null(runningTask);
+		}
+
+		[Theory(DisplayName = "Task; done; exception")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void Task_Done_Exception(SyncCallingPattern pattern) {
+			pattern.Test((cts, dndcts) => this.Test_Task_Done_Exception(cts, dndcts, targetValueTask: false));
+		}
+
+		[Theory(DisplayName = "ValueTask; done; exception")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void ValueTask_Done_Exception(SyncCallingPattern pattern) {
+			pattern.Test((cts, dndcts) => this.Test_Task_Done_Exception(cts, dndcts, targetValueTask: true));
+		}
+
+		protected void Test_Task_Done_Canceled(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask) {
+			// arrange
+			IRunningTaskMonitor target = CreateTarget();
+			Task task;
+			using (CancellationTokenSource cts = new CancellationTokenSource()) {
+				cts.Cancel();
+				task = Task.FromCanceled(cts.Token);
+			}
+			Debug.Assert(task.IsCanceled);
+
+			// act
+			IRunningTask? runningTask = targetValueTask switch {
+				true => target.MonitorTask(new ValueTask(task), cancellationTokenSource, doNotDisposeCancellationTokenSource),
+				_ => target.MonitorTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource)
+			};
+
+			// assert
+			// No need to create a RunningTask because the task finished.
+			Assert.Null(runningTask);
+		}
+
+		[Theory(DisplayName = "Task; done; canceled")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void Task_Done_Canceled(SyncCallingPattern pattern) {
+			pattern.Test((cts, dndcts) => this.Test_Task_Done_Canceled(cts, dndcts, targetValueTask: false));
+		}
+
+		[Theory(DisplayName = "ValueTask; done; canceled")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void ValueTask_Done_Canceled(SyncCallingPattern pattern) {
+			pattern.Test((cts, dndcts) => this.Test_Task_Done_Canceled(cts, dndcts, targetValueTask: true));
+		}
+
+		public void Test_Task_Running_Successful(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask) {
+			// arrange
+			PausableTestingAction sampleAction = new PausableTestingAction();
+			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+
+			IRunningTaskMonitor target = CreateTarget();
+			CancellationToken cancellationToken = (cancellationTokenSource != null) ? cancellationTokenSource.Token : CancellationToken.None; 
+			Task task = sampleAction.GetPausableActionTask(cancellationToken);
+			sampleAction.WaitForPause();
+			Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+
+			// act
+			IRunningTask? runningTask = targetValueTask switch {
+				true => target.MonitorTask(new ValueTask(task), cancellationTokenSource, doNotDisposeCancellationTokenSource),
+				_ => target.MonitorTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource)
+			};
 			Debug.Assert(runningTask != null);
 			Task actualTask = runningTask.Task;
 
 			sampleAction.Resume();
-			actualTask.Wait();
+			actualTask.WaitForCompletion();
 
 			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
+			// All works should be done.
+			Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
 			Assert.True(actualTask.IsCompletedSuccessfully);
 		}
 
-		[Fact(DisplayName = "task; exception")]
-		public void task_exception() {
+		[Theory(DisplayName = "Task; running; successful")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void Task_Running_Successful(SyncCallingPattern pattern) {
+			pattern.Test((cts, dndcts) => this.Test_Task_Running_Successful(cts, dndcts, targetValueTask: false));
+		}
+
+		[Theory(DisplayName = "ValueTask; running; successful")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void ValueTask_Running_Successful(SyncCallingPattern pattern) {
+			pattern.Test((cts, dndcts) => this.Test_Task_Running_Successful(cts, dndcts, targetValueTask: true));
+		}
+
+		protected void Test_Task_Running_Exception(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask) {
 			// arrange
 			Exception exception = new InvalidOperationException();
-			PausableTestAction sampleAction = new PausableTestAction(exception, throwOnCancellation: false);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
+			PausableTestingAction sampleAction = new PausableTestingAction(exception);
+			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+
+			IRunningTaskMonitor target = CreateTarget();
+			CancellationToken cancellationToken = (cancellationTokenSource != null) ? cancellationTokenSource.Token : CancellationToken.None;
+			Task task = sampleAction.GetPausableActionTask(cancellationToken);
+			sampleAction.WaitForPause();
+			Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+
+			// act
+			IRunningTask? runningTask = targetValueTask switch {
+				true => target.MonitorTask(new ValueTask(task), cancellationTokenSource, doNotDisposeCancellationTokenSource),
+				_ => target.MonitorTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource)
+			};
+			Debug.Assert(runningTask != null);
+			Task actualTask = runningTask.Task;
+
+			sampleAction.Resume();
+			actualTask.WaitForCompletion();
+
+			// assert
 			// Works.Worked should not be done due to the exception.
-			int expectedProgress = TestAction.Works.Terminated;
+			Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+			AssertExceptionOnTask(exception, actualTask);
+		}
+
+		[Theory(DisplayName = "Task; running; exception")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void Task_Running_Exception(SyncCallingPattern pattern) {
+			pattern.Test((cts, dndcts) => this.Test_Task_Running_Exception(cts, dndcts, targetValueTask: false));
+		}
+
+		[Theory(DisplayName = "ValueTask; running; exception")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void ValueTask_Running_Exception(SyncCallingPattern pattern) {
+			pattern.Test((cts, dndcts) => this.Test_Task_Running_Exception(cts, dndcts, targetValueTask: true));
+		}
+
+		protected void Test_Task_Running_CanceledWithException(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask) {
+			// arrange
+			PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: true);
+			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 			IRunningTaskMonitor target = CreateTarget();
-			Task task = sampleAction.GetPausableActionTask(cancellationTokenSource: null);
+			CancellationToken cancellationToken = (cancellationTokenSource != null) ? cancellationTokenSource.Token : CancellationToken.None;
+			Task task = sampleAction.GetPausableActionTask(cancellationToken);
 			sampleAction.WaitForPause();
-			Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
+			Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
 
 			// act
-			IRunningTask? runningTask = target.MonitorTask(task);
+			IRunningTask? runningTask = targetValueTask switch {
+				true => target.MonitorTask(new ValueTask(task), cancellationTokenSource, doNotDisposeCancellationTokenSource),
+				_ => target.MonitorTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource)
+			};
 			Debug.Assert(runningTask != null);
 			Task actualTask = runningTask.Task;
 
+			runningTask.Cancel();	// cancel the task
 			sampleAction.Resume();
-			Assert.Throws<AggregateException>(() => actualTask.Wait());
+			actualTask.WaitForCompletion();
 
 			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
-			AssertExceptionOnTask(exception, actualTask, nested: true);
-		}
-
-		[Fact(DisplayName = "task; cancel by exception; cancellationTokenSource: non-null, doNotDisposeCancellationTokenSource: false")]
-		public void task_cancel_by_exception_cancellationTokenSource_nonnull_doNotDisposeCancellationTokenSource_false() {
-			// arrange
-			PausableTestAction sampleAction = new PausableTestAction(throwOnCancellation: true);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// Works.Worked should not be done due to the cancellation.
-			int expectedProgress = TestAction.Works.Terminated;
-
-			IRunningTaskMonitor target = CreateTarget();
-			TestingCancellationTokenSource cancellationTokenSource = new TestingCancellationTokenSource();
-			Debug.Assert(cancellationTokenSource.DisposeCount == 0);
-			Task task = sampleAction.GetPausableActionTask(cancellationTokenSource);
-			bool doNotDisposeCancellationTokenSource = false;
-
-			// act
-			IRunningTask? runningTask = target.MonitorTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource);
-			Assert.NotNull(runningTask);
-			Debug.Assert(runningTask != null);
-			Task actualTask = runningTask.Task;
-
-			sampleAction.WaitForPause();
-			Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
-			runningTask.Cancel();
-			sampleAction.Resume();
-
-			AggregateException aggregateException = Assert.Throws<AggregateException>(() => actualTask.Wait());
-
-			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
-			Assert.True(actualTask.IsCanceled);
-			Assert.IsAssignableFrom<TaskCanceledException>(aggregateException.InnerException);
-			Assert.Equal(1, cancellationTokenSource.DisposeCount);
-		}
-
-		[Fact(DisplayName = "task; cancel by exception; cancellationTokenSource: non-null, doNotDisposeCancellationTokenSource: true")]
-		public void task_cancel_by_exception_cancellationTokenSource_nonnull_doNotDisposeCancellationTokenSource_true() {
-			// arrange
-			PausableTestAction sampleAction = new PausableTestAction(throwOnCancellation: true);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// Works.Worked should not be done due to the cancellation.
-			int expectedProgress = TestAction.Works.Terminated;
-
-			IRunningTaskMonitor target = CreateTarget();
-			using (TestingCancellationTokenSource cancellationTokenSource = new TestingCancellationTokenSource()) {
-				Debug.Assert(cancellationTokenSource.DisposeCount == 0);
-				Task task = sampleAction.GetPausableActionTask(cancellationTokenSource);
-				bool doNotDisposeCancellationTokenSource = true;
-
-				// act
-				IRunningTask? runningTask = target.MonitorTask(task, cancellationTokenSource, doNotDisposeCancellationTokenSource);
-				Assert.NotNull(runningTask);
-				Debug.Assert(runningTask != null);
-				Task actualTask = runningTask.Task;
-
-				sampleAction.WaitForPause();
-				Debug.Assert(sampleAction.Progress == PausableTestAction.Works.Started);
-				runningTask.Cancel();
-				sampleAction.Resume();
-
-				AggregateException aggregateException = Assert.Throws<AggregateException>(() => actualTask.Wait());
-
-				// assert
-				Assert.Equal(expectedProgress, sampleAction.Progress);
+			if (cancellationTokenSource == null) {
+				// All works should be done, because runningTask.Cancel() gave no effect.
+				Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+				Assert.True(actualTask.IsCompletedSuccessfully);
+			} else {
+				// Works.Worked should not be done due to the exception.
+				Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
 				Assert.True(actualTask.IsCanceled);
-				Assert.IsAssignableFrom<TaskCanceledException>(aggregateException.InnerException);
-				Assert.Equal(0, cancellationTokenSource.DisposeCount);
 			}
 		}
 
-
-
-
-
-
-
-		[Fact(DisplayName = "task; done, successful")]
-		public void task_done_successful() {
-			// arrange
-			TestAction sampleAction = new TestAction();
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// All works should be done.
-			int expectedProgress = TestAction.Works.All;
-
-			IRunningTaskMonitor target = CreateTarget();
-			Task task = sampleAction.GetSimpleActionTask(cancellationTokenSource: null);
-			task.Wait();
-
-			// act
-			IRunningTask? runningTask = target.MonitorTask(task);
-
-			// assert
-			Assert.Null(runningTask);
-			Assert.Equal(expectedProgress, sampleAction.Progress);
+		[Theory(DisplayName = "Task; running; canceled with exception")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void Task_Running_CanceledWithException(SyncCallingPattern pattern) {
+			pattern.Test((cts, dnd) => Test_Task_Running_CanceledWithException(cts, dnd, targetValueTask: false));
 		}
 
-		[Fact(DisplayName = "task; done, exception")]
-		public void task_done_exception() {
-			// arrange
-			NotSupportedException exception = new NotSupportedException();
-			TestAction sampleAction = new TestAction(exception);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// Works.Worked should not be done because the exception occurs.
-			int expectedProgress = TestAction.Works.Terminated;
-
-			IRunningTaskMonitor target = CreateTarget();
-			Task task = sampleAction.GetSimpleActionTask(cancellationTokenSource: null);
-			Assert.Throws<AggregateException>(() => task.Wait());
-
-			// act
-			IRunningTask? runningTask = target.MonitorTask(task);
-			Assert.NotNull(runningTask);
-			Debug.Assert(runningTask != null);
-			Task actualTask = runningTask.Task;
-			Assert.Throws<AggregateException>(() => task.Wait());
-
-			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
-			AssertExceptionOnTask(exception, actualTask, nested: true);
-		}
-
-		[Fact(DisplayName = "value task; done, successful")]
-		public void valuetask_done_successful() {
-			// arrange
-			TestAction sampleAction = new TestAction();
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// All works should be done.
-			int expectedProgress = TestAction.Works.All;
-
-			IRunningTaskMonitor target = CreateTarget();
-			Task task = sampleAction.GetSimpleActionTask(cancellationTokenSource: null);
-			ValueTask valueTask = new ValueTask(task);
-			task.Wait();
-
-			// act
-			IRunningTask? runningTask = target.MonitorTask(valueTask);
-
-			// assert
-			Assert.Null(runningTask);
-			Assert.Equal(expectedProgress, sampleAction.Progress);
-		}
-
-		[Fact(DisplayName = "value task; done, exception")]
-		public void valuetask_done_exception() {
-			// arrange
-			NotSupportedException exception = new NotSupportedException();
-			TestAction sampleAction = new TestAction(exception);
-			Debug.Assert(sampleAction.Progress == TestAction.Works.None);
-			// Works.Worked should not be done because the exception occurs.
-			int expectedProgress = TestAction.Works.Terminated;
-
-			IRunningTaskMonitor target = CreateTarget();
-			Task task = sampleAction.GetSimpleActionTask(cancellationTokenSource: null);
-			ValueTask valueTask = new ValueTask(task);
-			Assert.Throws<AggregateException>(() => task.Wait());
-
-			// act
-			IRunningTask? runningTask = target.MonitorTask(valueTask);
-			Assert.NotNull(runningTask);
-			Debug.Assert(runningTask != null);
-			Task actualTask = runningTask.Task;
-			Assert.Throws<AggregateException>(() => actualTask.Wait());
-
-			// assert
-			Assert.Equal(expectedProgress, sampleAction.Progress);
-			AssertExceptionOnTask(exception, actualTask, nested: true);
+		[Theory(DisplayName = "ValueTask; running; canceled with exception")]
+		[MemberData(nameof(GetSyncCallingPatternData))]
+		public void ValueTask_Running_CanceledWithException(SyncCallingPattern pattern) {
+			pattern.Test((cts, dnd) => Test_Task_Running_CanceledWithException(cts, dnd, targetValueTask: true));
 		}
 
 		#endregion

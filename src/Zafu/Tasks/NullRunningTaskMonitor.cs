@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Zafu.Disposing;
 
 namespace Zafu.Tasks {
 	/// <summary>
@@ -39,14 +40,18 @@ namespace Zafu.Tasks {
 				throw new ArgumentNullException(nameof(action));
 			}
 
-			// create a RunningTask object for the action
-			RunningTask runningTask = RunningTask.Create((RunningTask rt) => {
-				Debug.Assert(rt != null);
-				action();
-			});
+			// create a RunningTask object for the action and start its task
+			RunningTask runningTask = new RunningTask(
+				runningContext: null,
+				cancellationTokenSource: null,
+				doNotDisposeCancellationTokenSource: false,
+				action: (RunningTask rt) => {
+					action();
+				}
+			);
 			try {
 				// start the task
-				runningTask.Task.Start();
+				runningTask.Start();
 				return runningTask;
 			} catch {
 				runningTask.DisposeCancellationTokenSource();
@@ -59,15 +64,23 @@ namespace Zafu.Tasks {
 			if (action == null) {
 				throw new ArgumentNullException(nameof(action));
 			}
+			if (cancellationTokenSource == null) {
+				cancellationTokenSource = new CancellationTokenSource();
+				doNotDisposeCancellationTokenSource = false;
+			}
 
-			// create a RunningTask object for the action
-			RunningTask runningTask = RunningTask.Create((RunningTask rt, CancellationToken ct) => {
-				Debug.Assert(rt != null);
-				action(ct);
-			}, cancellationTokenSource, doNotDisposeCancellationTokenSource);
+			// create a RunningTask object for the action and start its task
+			RunningTask runningTask = new RunningTask(
+				runningContext: null,
+				cancellationTokenSource: cancellationTokenSource,
+				doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
+				action: (RunningTask rt) => {
+					action(rt.CancellationToken);
+				}
+			);
 			try {
 				// start the task
-				runningTask.Task.Start();
+				runningTask.Start();
 				return runningTask;
 			} catch {
 				runningTask.DisposeCancellationTokenSource();
@@ -80,20 +93,27 @@ namespace Zafu.Tasks {
 			if (task == null) {
 				throw new ArgumentNullException(nameof(task));
 			}
-			if (task.IsCompletedSuccessfully) {
+			if (task.IsCompleted) {
 				// nothing to do
+				if (doNotDisposeCancellationTokenSource == false) {
+					DisposingUtil.DisposeLoggingException(cancellationTokenSource);
+				}
 				return null;
 			}
 			// cancellationTokenSource can be null
 
 			// create a RunningTask object for the task
-			RunningTask runningTask = RunningTask.Create((RunningTask rt) => {
-				Debug.Assert(rt != null);
-				task.Wait();
-			}, cancellationTokenSource, doNotDisposeCancellationTokenSource);
+			RunningTask runningTask = new RunningTask(
+				runningContext: null,
+				cancellationTokenSource: cancellationTokenSource,
+				doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
+				action: (RunningTask rt) => {
+					task.Sync();
+				}
+			);
 			try {
 				// start the task
-				runningTask.Task.Start();
+				runningTask.Start();
 				return runningTask;
 			} catch {
 				runningTask.DisposeCancellationTokenSource();

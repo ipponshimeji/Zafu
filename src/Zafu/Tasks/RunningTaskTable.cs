@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Zafu.ObjectModel;
+using Zafu.Disposing;
 
 namespace Zafu.Tasks {
 	public class RunningTaskTable: DisposableObject, IRunningTaskTable, IRunningTaskMonitor {
@@ -36,10 +37,11 @@ namespace Zafu.Tasks {
 
 		#region creation & disposable
 
-		public RunningTaskTable(IRunningContext? runningContext = null, string? name = null) : base(runningContext, null, name) {
+		public RunningTaskTable(IRunningContext? runningContext = null, string? name = null) : base(runningContext, null, CorrectWithDefault(name)) {
 		}
 
-		public RunningTaskTable(IRunningContext? runningContext = null) : base(runningContext, null, DefaultName) {
+		private static string CorrectWithDefault(string? name) {
+			return name ?? DefaultName;
 		}
 
 		protected override void Dispose(bool disposing) {
@@ -109,18 +111,23 @@ namespace Zafu.Tasks {
 				throw new ArgumentNullException(nameof(action));
 			}
 
-			// create a RunningTask object for the action
-			RunningTask runningTask = RunningTask.Create((RunningTask rt) => {
-				Debug.Assert(rt != null);
-				try {
-					action();
-				} catch (Exception exception) {
-					OnTaskException(rt, exception);
-					throw;
-				} finally {
-					UnregisterRunningTask(rt);
+			// create a RunningTask object for the action and start its task
+			RunningTask runningTask = new RunningTask(
+				runningContext: this.RunningContext,
+				cancellationTokenSource: null,
+				doNotDisposeCancellationTokenSource: false,
+				action: (RunningTask rt) => {
+					Debug.Assert(rt != null);
+					try {
+						action();
+					} catch (Exception exception) {
+						OnTaskException(rt.Task, exception);
+						throw;
+					} finally {
+						UnregisterRunningTask(rt);
+					}
 				}
-			});
+			);
 			try {
 				// register the task to the running task table and start it
 				return RegisterRunningTaskAndStart(runningTask);
@@ -135,19 +142,28 @@ namespace Zafu.Tasks {
 			if (action == null) {
 				throw new ArgumentNullException(nameof(action));
 			}
+			if (cancellationTokenSource == null) {
+				cancellationTokenSource = new CancellationTokenSource();
+				doNotDisposeCancellationTokenSource = false;
+			}
 
-			// create a RunningTask object for the action
-			RunningTask runningTask = RunningTask.Create((RunningTask rt, CancellationToken ct) => {
-				Debug.Assert(rt != null);
-				try {
-					action(ct);
-				} catch (Exception exception) {
-					OnTaskException(rt, exception);
-					throw;
-				} finally {
-					UnregisterRunningTask(rt);
+			// create a RunningTask object for the action and start its task
+			RunningTask runningTask = new RunningTask(
+				runningContext: this.RunningContext,
+				cancellationTokenSource: cancellationTokenSource,
+				doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
+				action: (RunningTask rt) => {
+					Debug.Assert(rt != null);
+					try {
+						action(rt.CancellationToken);
+					} catch (Exception exception) {
+						OnTaskException(rt.Task, exception);
+						throw;
+					} finally {
+						UnregisterRunningTask(rt);
+					}
 				}
-			}, cancellationTokenSource, doNotDisposeCancellationTokenSource);
+			);
 			try {
 				// register the task to the running task table and start it
 				return RegisterRunningTaskAndStart(runningTask);
@@ -162,25 +178,39 @@ namespace Zafu.Tasks {
 			if (task == null) {
 				throw new ArgumentNullException(nameof(task));
 			}
-			if (task.IsCompletedSuccessfully) {
+			if (task.IsCompleted) {
 				// nothing to do
+				if (doNotDisposeCancellationTokenSource == false) {
+					DisposingUtil.DisposeLoggingException(cancellationTokenSource);
+				}
+				if (task.IsCompletedSuccessfully == false) {
+					try {
+						task.Sync();
+					} catch (Exception exception) {
+						OnTaskException(task, exception);
+					}
+				}
 				return null;
 			}
 			// cancellationTokenSource can be null
 
 			// create a RunningTask object for the task
-			RunningTask runningTask = RunningTask.Create((RunningTask rt) => {
-				Debug.Assert(rt != null);
-				try {
-					task.Wait();
-				} catch (Exception exception) {
-					// TODO: should unwrap AggregateException?
-					OnTaskException(rt, exception);
-					throw;
-				} finally {
-					UnregisterRunningTask(rt);
+			RunningTask runningTask = new RunningTask(
+				runningContext: this.RunningContext,
+				cancellationTokenSource: cancellationTokenSource,
+				doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
+				action: (RunningTask rt) => {
+					Debug.Assert(rt != null);
+					try {
+						task.Sync();
+					} catch (Exception exception) {
+						OnTaskException(rt.Task, exception);
+						throw;
+					} finally {
+						UnregisterRunningTask(rt);
+					}
 				}
-			}, cancellationTokenSource, doNotDisposeCancellationTokenSource);
+			);
 			try {
 				// register the task to the running task table and start it
 				return RegisterRunningTaskAndStart(runningTask);
@@ -195,6 +225,16 @@ namespace Zafu.Tasks {
 
 		#region methods
 
+		protected void Log(Task? task, LogLevel logLevel, string message, Exception? exception = null) {
+			// check argument
+			if (task == null) {
+				throw new ArgumentNullException(nameof(task));
+			}
+
+			// log
+			Log<int>(logLevel, message, "task-id", task.Id, exception, default(EventId));
+		}
+
 		protected void Log(RunningTask? runningTask, LogLevel logLevel, string message, Exception? exception = null) {
 			// check argument
 			if (runningTask == null) {
@@ -202,7 +242,7 @@ namespace Zafu.Tasks {
 			}
 
 			// log
-			Log<int>(logLevel, message, "task-id", runningTask.Task.Id, exception, default(EventId));
+			Log(runningTask.Task, logLevel, message, exception);
 		}
 
 		#endregion
@@ -210,9 +250,9 @@ namespace Zafu.Tasks {
 
 		#region overridables
 
-		protected virtual void OnTaskException(RunningTask runningTask, Exception exception) {
+		protected virtual void OnTaskException(Task task, Exception exception) {
 			if (this.LoggingLevel <= LogLevel.Error) {
-				Log(runningTask, LogLevel.Error, "The running task threw an exception.", exception);
+				Log(task, LogLevel.Error, "The running task threw an exception.", exception);
 			}
 		}
 
@@ -268,7 +308,7 @@ namespace Zafu.Tasks {
 				// Make sure that the task starts after it is registered to the running task table.
 				// Otherwise, RegisterRunningTask() may run after UnregisterRunningTask() and
 				// the entry would remain forever if the task finishes immediately.
-				runningTask.Task.Start();
+				runningTask.Start();
 			} catch (Exception exception) {
 				UnregisterRunningTask(runningTask);
 				if (this.LoggingLevel <= LogLevel.Error) {

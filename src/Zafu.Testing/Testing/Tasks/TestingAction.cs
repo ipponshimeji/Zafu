@@ -4,8 +4,8 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Zafu.Tasks.Testing {
-	public class TestAction {
+namespace Zafu.Testing.Tasks {
+	public class TestingAction {
 		#region types
 
 		public class Works {
@@ -33,7 +33,7 @@ namespace Zafu.Tasks.Testing {
 
 		#region data
 
-		private static MethodInfo exceptionSourceMethod = null;
+		private static MethodInfo? exceptionSourceMethod = null;
 
 		public readonly Exception? Exception;
 
@@ -48,14 +48,14 @@ namespace Zafu.Tasks.Testing {
 
 		public static MethodInfo ExceptionSourceMethod {
 			get {
-				MethodInfo value = exceptionSourceMethod;
+				MethodInfo? value = exceptionSourceMethod;
 				if (value == null) {
 					BindingFlags flags = (
 						BindingFlags.DeclaredOnly |
 						BindingFlags.Instance |
 						BindingFlags.NonPublic
 					);
-					MethodInfo? temp = typeof(TestAction).GetMethod("Work", flags);
+					MethodInfo? temp = typeof(TestingAction).GetMethod("Work", flags);
 					if (temp == null) {
 						// unexpected state; the implementation was broken
 						throw new NotSupportedException();
@@ -74,7 +74,7 @@ namespace Zafu.Tasks.Testing {
 
 		#region creation
 
-		public TestAction(Exception? exception = null, bool throwOnCancellation = false) {
+		public TestingAction(Exception? exception = null, bool throwOnCancellation = false) {
 			// check argument
 			// exception can be null
 
@@ -165,34 +165,6 @@ namespace Zafu.Tasks.Testing {
 			return new ValueTask<T>(GetSimpleActionTask<T>(cancellationToken, result));
 		}
 
-		#endregion
-
-
-		#region obsoletes
-
-		protected static Task GetActionTask(CancellationTokenSource? cancellationTokenSource, Action<CancellationToken> action) {
-			// check argument
-			// cancellationTokenSource can be null
-			if (action == null) {
-				throw new ArgumentNullException(nameof(action));
-			}
-
-			// create a task to run the action
-			CancellationToken cancellationToken = (cancellationTokenSource != null) ? cancellationTokenSource.Token : CancellationToken.None;
-			return Task.Run(() => action(cancellationToken), cancellationToken);
-		}
-
-		protected static ValueTask GetActionValueTask(CancellationTokenSource? cancellationTokenSource, Action<CancellationToken> action) {
-			return new ValueTask(GetActionTask(cancellationTokenSource, action));
-		}
-
-		public Task GetSimpleActionTask(CancellationTokenSource? cancellationTokenSource) {
-			return GetActionTask(cancellationTokenSource, this.SimpleAction);
-		}
-
-		public ValueTask GetSimpleActionValueTask(CancellationTokenSource? cancellationTokenSource) {
-			return GetActionValueTask(cancellationTokenSource, this.SimpleAction);
-		}
 		#endregion
 	}
 }

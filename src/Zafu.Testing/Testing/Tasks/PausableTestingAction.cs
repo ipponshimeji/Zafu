@@ -3,8 +3,8 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Zafu.Tasks.Testing {
-	public class PausableTestAction: TestAction, IDisposable {
+namespace Zafu.Testing.Tasks {
+	public class PausableTestingAction: TestingAction, IDisposable {
 		#region data
 
 		private AutoResetEvent? pausedEvent = new AutoResetEvent(false);
@@ -16,7 +16,7 @@ namespace Zafu.Tasks.Testing {
 
 		#region creation & disposal
 
-		public PausableTestAction(Exception? exception = null, bool throwOnCancellation = false): base(exception, throwOnCancellation) {
+		public PausableTestingAction(Exception? exception = null, bool throwOnCancellation = false): base(exception, throwOnCancellation) {
 		}
 
 		public void Dispose() {
@@ -127,19 +127,6 @@ namespace Zafu.Tasks.Testing {
 
 		public ValueTask<T> GetPausableActionValueTask<T>(CancellationToken cancellationToken, T result) {
 			return new ValueTask<T>(GetPausableActionTask<T>(cancellationToken, result));
-		}
-
-		#endregion
-
-
-		#region obsoletes
-
-		public Task GetPausableActionTask(CancellationTokenSource? cancellationTokenSource) {
-			return GetActionTask(cancellationTokenSource, this.PausableAction);
-		}
-
-		public ValueTask GetPausableActionValueTask(CancellationTokenSource? cancellationTokenSource) {
-			return GetActionValueTask(cancellationTokenSource, this.PausableAction);
 		}
 
 		#endregion
