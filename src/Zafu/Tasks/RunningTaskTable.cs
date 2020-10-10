@@ -111,64 +111,64 @@ namespace Zafu.Tasks {
 				throw new ArgumentNullException(nameof(action));
 			}
 
-			// create a RunningTask object for the action and start its task
+			// create a RunningTask object for the action
 			RunningTask runningTask = new RunningTask(
 				runningContext: this.RunningContext,
-				cancellationTokenSource: null,
-				doNotDisposeCancellationTokenSource: false,
 				action: (RunningTask rt) => {
 					Debug.Assert(rt != null);
 					try {
 						action();
+						OnTaskFinishing(rt.Task, null);
 					} catch (Exception exception) {
-						OnTaskException(rt.Task, exception);
+						OnTaskFinishing(rt.Task, exception);
 						throw;
 					} finally {
 						UnregisterRunningTask(rt);
 					}
 				}
 			);
-			try {
-				// register the task to the running task table and start it
-				return RegisterRunningTaskAndStart(runningTask);
-			} catch {
-				runningTask.DisposeCancellationTokenSource();
-				throw;
-			}
+
+			// register the task to the running task table and start the task
+			return RegisterRunningTaskAndStart(runningTask, cancellationTokenSource: null, doNotDisposeCancellationTokenSource: false);
 		}
 
-		public virtual IRunningTask MonitorTask(Action<CancellationToken> action, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false) {
-			// check argument
+		public virtual IRunningTask MonitorTask(Action<CancellationToken> action, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
+			// check arguments
 			if (action == null) {
 				throw new ArgumentNullException(nameof(action));
 			}
-			if (cancellationTokenSource == null) {
-				cancellationTokenSource = new CancellationTokenSource();
-				doNotDisposeCancellationTokenSource = false;
-			}
+			// cancellationTokenSource can be null
 
-			// create a RunningTask object for the action and start its task
+			// create a RunningTask object for the action
 			RunningTask runningTask = new RunningTask(
 				runningContext: this.RunningContext,
-				cancellationTokenSource: cancellationTokenSource,
-				doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
 				action: (RunningTask rt) => {
 					Debug.Assert(rt != null);
 					try {
 						action(rt.CancellationToken);
+						OnTaskFinishing(rt.Task, null);
 					} catch (Exception exception) {
-						OnTaskException(rt.Task, exception);
+						OnTaskFinishing(rt.Task, exception);
 						throw;
 					} finally {
 						UnregisterRunningTask(rt);
 					}
 				}
 			);
+
+			// register the task to the running task table and start the task
+			CancellationTokenSource? createdCancellationTokenSource = null;
+			if (cancellationTokenSource == null) {
+				createdCancellationTokenSource = new CancellationTokenSource();
+				cancellationTokenSource = createdCancellationTokenSource;
+				doNotDisposeCancellationTokenSource = false;
+			}
 			try {
-				// register the task to the running task table and start it
-				return RegisterRunningTaskAndStart(runningTask);
+				return RegisterRunningTaskAndStart(runningTask, cancellationTokenSource, doNotDisposeCancellationTokenSource);
 			} catch {
-				runningTask.DisposeCancellationTokenSource();
+				if (createdCancellationTokenSource != null) {
+					createdCancellationTokenSource.Dispose();
+				}
 				throw;
 			}
 		}
@@ -179,17 +179,11 @@ namespace Zafu.Tasks {
 				throw new ArgumentNullException(nameof(task));
 			}
 			if (task.IsCompleted) {
-				// nothing to do
+				// The task has already finished.
 				if (doNotDisposeCancellationTokenSource == false) {
 					DisposingUtil.DisposeLoggingException(cancellationTokenSource);
 				}
-				if (task.IsCompletedSuccessfully == false) {
-					try {
-						task.Sync();
-					} catch (Exception exception) {
-						OnTaskException(task, exception);
-					}
-				}
+				OnTaskFinished(task);
 				return null;
 			}
 			// cancellationTokenSource can be null
@@ -197,27 +191,37 @@ namespace Zafu.Tasks {
 			// create a RunningTask object for the task
 			RunningTask runningTask = new RunningTask(
 				runningContext: this.RunningContext,
-				cancellationTokenSource: cancellationTokenSource,
-				doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
 				action: (RunningTask rt) => {
 					Debug.Assert(rt != null);
 					try {
 						task.Sync();
+						OnTaskFinishing(rt.Task, null);
 					} catch (Exception exception) {
-						OnTaskException(rt.Task, exception);
+						OnTaskFinishing(rt.Task, exception);
 						throw;
 					} finally {
 						UnregisterRunningTask(rt);
 					}
 				}
 			);
-			try {
-				// register the task to the running task table and start it
-				return RegisterRunningTaskAndStart(runningTask);
-			} catch {
-				runningTask.DisposeCancellationTokenSource();
-				throw;
+
+			// register the task to the running task table and start the task
+			return RegisterRunningTaskAndStart(runningTask, cancellationTokenSource, doNotDisposeCancellationTokenSource);
+		}
+
+		public virtual IRunningTask? MonitorTask(ValueTask valueTask, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
+			// check argument
+			if (valueTask.IsCompleted) {
+				// nothing to do
+				if (doNotDisposeCancellationTokenSource == false) {
+					DisposingUtil.DisposeLoggingException(cancellationTokenSource);
+				}
+				// TODO: logging
+				return null;
 			}
+			// cancellationTokenSource can be null
+
+			return MonitorTask(valueTask.AsTask(), cancellationTokenSource, doNotDisposeCancellationTokenSource);
 		}
 
 		#endregion
@@ -245,14 +249,45 @@ namespace Zafu.Tasks {
 			Log(runningTask.Task, logLevel, message, exception);
 		}
 
+		protected virtual void OnTaskFinished(Task task) {
+			// check argument
+			Debug.Assert(task != null);
+			Debug.Assert(task.IsCompleted);
+
+			Exception? exception = null;
+			if (task.IsFaulted) {
+				AggregateException? aggregateException = task.Exception;
+				Debug.Assert(aggregateException != null);
+				exception = aggregateException.InnerException;
+			} else if (task.IsCanceled) {
+				exception = new TaskCanceledException();
+			}
+			OnTaskFinishing(task, exception);
+		}
+
 		#endregion
 
 
 		#region overridables
 
-		protected virtual void OnTaskException(Task task, Exception exception) {
-			if (this.LoggingLevel <= LogLevel.Error) {
-				Log(task, LogLevel.Error, "The running task threw an exception.", exception);
+		protected virtual void OnTaskFinishing(Task task, Exception? exception) {
+			// Note that task is not completed at this point.
+			// That is, task.IsCompleted is false and it does not have final result.
+			// So you cannot use task.IsFaulted, task.IsCanceled, and task.IsCompletedSuccessfully here.
+
+			// check argument
+			Debug.Assert(task != null);
+
+			if (exception == null) {
+				// task is finishing successfully
+				if (this.LoggingLevel <= LogLevel.Debug) {
+					Log(task, LogLevel.Debug, "The running task finished successfully.", exception);
+				}
+			} else {
+				// task throws an exception
+				if (this.LoggingLevel <= LogLevel.Error) {
+					Log(task, LogLevel.Error, "The running task ended with an exception.", exception);
+				}
 			}
 		}
 
@@ -297,7 +332,7 @@ namespace Zafu.Tasks {
 			}
 		}
 
-		private IRunningTask RegisterRunningTaskAndStart(RunningTask runningTask) {
+		private IRunningTask RegisterRunningTaskAndStart(RunningTask runningTask, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
 			// check arguments
 			Debug.Assert(runningTask != null);
 
@@ -306,9 +341,9 @@ namespace Zafu.Tasks {
 			try {
 				// start the task
 				// Make sure that the task starts after it is registered to the running task table.
-				// Otherwise, RegisterRunningTask() may run after UnregisterRunningTask() and
-				// the entry would remain forever if the task finishes immediately.
-				runningTask.Start();
+				// Otherwise, if the task finishes immediately, RegisterRunningTask() may run
+				// after UnregisterRunningTask() and the entry would remain.
+				runningTask.Start(cancellationTokenSource, doNotDisposeCancellationTokenSource);
 			} catch (Exception exception) {
 				UnregisterRunningTask(runningTask);
 				if (this.LoggingLevel <= LogLevel.Error) {

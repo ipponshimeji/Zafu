@@ -11,10 +11,10 @@ namespace Zafu.Tasks.Tests {
 	public class NullRunningTaskMonitorTest {
 		#region IRunningTaskMonitor
 
-		public class IRunningTaskMonitorTest: IRunningTaskMonitorTestBase {
+		public class IRunningTaskMonitorTest: IRunningTaskMonitorTestBase<NullRunningTaskMonitor> {
 			#region overrides
 
-			protected override IRunningTaskMonitor CreateTarget() {
+			protected override NullRunningTaskMonitor CreateTarget() {
 				return NullRunningTaskMonitor.Instance;
 			}
 

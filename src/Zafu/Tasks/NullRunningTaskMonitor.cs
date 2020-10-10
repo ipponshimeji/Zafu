@@ -9,11 +9,14 @@ namespace Zafu.Tasks {
 	/// <para>
 	/// The class to provide simple <see cref="IRunningTaskMonitor"/> feature,
 	/// which runs tasks but does not trace their state.
-	/// In the other hand, <see cref="RunningTaskTable"/> monitors the tasks in its table and
+	/// In the other hand, <see cref="RunningTaskTable"/> monitors the tasks with its table and
 	/// writes log if an exception happens in a task.
 	/// </para>
 	/// <para>
-	/// This class does not maintain running task table, so it does not implement <see cref="IRunningTaskTable"/>.
+	/// This class does not implement <see cref="IRunningTaskTable"/> because it does not maintain running task table.
+	/// </para>
+	/// <para>
+	/// An instance of this class is stateless. Use <see cref="Instance"/> static field to access shared instance.
 	/// </para>
 	/// </summary>
 	public class NullRunningTaskMonitor: IRunningTaskMonitor {
@@ -40,56 +43,50 @@ namespace Zafu.Tasks {
 				throw new ArgumentNullException(nameof(action));
 			}
 
-			// create a RunningTask object for the action and start its task
+			// create a RunningTask object for the action
 			RunningTask runningTask = new RunningTask(
 				runningContext: null,
-				cancellationTokenSource: null,
-				doNotDisposeCancellationTokenSource: false,
-				action: (RunningTask rt) => {
-					action();
-				}
+				action: (RunningTask rt) => action()
 			);
-			try {
-				// start the task
-				runningTask.Start();
-				return runningTask;
-			} catch {
-				runningTask.DisposeCancellationTokenSource();
-				throw;
-			}
+
+			// start the RunningTask
+			runningTask.Start(cancellationTokenSource: null, doNotDisposeCancellationTokenSource: false);
+			return runningTask;
 		}
 
-		public IRunningTask MonitorTask(Action<CancellationToken> action, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false) {
-			// check argument
+		public IRunningTask MonitorTask(Action<CancellationToken> action, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
+			// check arguments
 			if (action == null) {
 				throw new ArgumentNullException(nameof(action));
 			}
-			if (cancellationTokenSource == null) {
-				cancellationTokenSource = new CancellationTokenSource();
-				doNotDisposeCancellationTokenSource = false;
-			}
+			// cancellationTokenSource can be null
 
-			// create a RunningTask object for the action and start its task
+			// create a RunningTask object for the action
 			RunningTask runningTask = new RunningTask(
 				runningContext: null,
-				cancellationTokenSource: cancellationTokenSource,
-				doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
-				action: (RunningTask rt) => {
-					action(rt.CancellationToken);
-				}
+				action: (RunningTask rt) => action(rt.CancellationToken)
 			);
+
+			// start the RunningTask
+			CancellationTokenSource? createdCancellationTokenSource = null;
+			if (cancellationTokenSource == null) {
+				createdCancellationTokenSource = new CancellationTokenSource();
+				cancellationTokenSource = createdCancellationTokenSource;
+				doNotDisposeCancellationTokenSource = false;
+			}
 			try {
-				// start the task
-				runningTask.Start();
+				runningTask.Start(cancellationTokenSource, doNotDisposeCancellationTokenSource);
 				return runningTask;
 			} catch {
-				runningTask.DisposeCancellationTokenSource();
+				if (createdCancellationTokenSource != null) {
+					createdCancellationTokenSource.Dispose();
+				}
 				throw;
 			}
 		}
 
-		public IRunningTask? MonitorTask(Task task, CancellationTokenSource? cancellationTokenSource = null, bool doNotDisposeCancellationTokenSource = false) {
-			// check argument
+		public IRunningTask? MonitorTask(Task task, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
+			// check arguments
 			if (task == null) {
 				throw new ArgumentNullException(nameof(task));
 			}
@@ -105,20 +102,12 @@ namespace Zafu.Tasks {
 			// create a RunningTask object for the task
 			RunningTask runningTask = new RunningTask(
 				runningContext: null,
-				cancellationTokenSource: cancellationTokenSource,
-				doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
-				action: (RunningTask rt) => {
-					task.Sync();
-				}
+				action: (RunningTask rt) => task.Sync()
 			);
-			try {
-				// start the task
-				runningTask.Start();
-				return runningTask;
-			} catch {
-				runningTask.DisposeCancellationTokenSource();
-				throw;
-			}
+
+			// start the RunningTask
+			runningTask.Start(cancellationTokenSource, doNotDisposeCancellationTokenSource);
+			return runningTask;
 		}
 
 		#endregion

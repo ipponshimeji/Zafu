@@ -190,84 +190,42 @@ namespace Zafu.Tasks.Tests {
 
 				protected void Test_Running_Successful(Action<TTarget>? additionalAsserts = null) {
 					// arrange
-					PausableTestingAction sampleAction = new PausableTestingAction();
-					Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+					using (PausableTestingAction sampleAction = new PausableTestingAction()) {
+						Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
-					T result = GetResult();
-					TTask task = GetPausableActionTask(sampleAction, CancellationToken.None, result);
-					// The task should not finish at this point.
-					sampleAction.WaitForPause();
-					Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+						T result = GetResult();
+						TTask task = GetPausableActionTask(sampleAction, CancellationToken.None, result);
+						// The task should not finish at this point.
+						sampleAction.WaitForPause();
+						Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
 
-					TTarget target = GetTarget(task);
-					bool passThroughAggregateException = false;
+						TTarget target = GetTarget(task);
+						bool passThroughAggregateException = false;
 
-					// act
-					(T actualResult, Exception? actualException) = CallSyncOnAnotherThread(target, passThroughAggregateException, sampleAction);
-					task.WaitForCompletion();
-					Debug.Assert(task.IsCompleted);
+						// act
+						(T actualResult, Exception? actualException) = CallSyncOnAnotherThread(target, passThroughAggregateException, sampleAction);
+						task.WaitForCompletion();
+						Debug.Assert(task.IsCompleted);
 
-					// assert
-					// All works should be done.
-					Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
-					Assert.Equal(result, actualResult);
-					Assert.Null(actualException);
-					if (additionalAsserts != null) {
-						additionalAsserts(target);
+						// assert
+						// All works should be done.
+						Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+						Assert.Equal(result, actualResult);
+						Assert.Null(actualException);
+						if (additionalAsserts != null) {
+							additionalAsserts(target);
+						}
 					}
 				}
 
 				protected void Test_Running_Exception(bool passThroughAggregateException, Action<TTarget>? additionalAsserts = null) {
 					// arrange
 					Exception exception = new NotSupportedException();
-					PausableTestingAction sampleAction = new PausableTestingAction(exception);
-					Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
-
-					T result = GetResult();
-					TTask task = GetPausableActionTask(sampleAction, CancellationToken.None, result);
-					// The task should not finish at this point.
-					sampleAction.WaitForPause();
-					Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
-
-					TTarget target = GetTarget(task);
-
-					// act
-					(T actualResult, Exception? capturedException) = CallSyncOnAnotherThread(target, passThroughAggregateException, sampleAction);
-					task.WaitForCompletion();
-					Debug.Assert(task.IsCompleted);
-
-					// assert
-					// Works.Worked should not be done due to the exception.
-					Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
-
-					Exception? actualException;
-					if (passThroughAggregateException) {
-						// capturedException should be an AggregateException which wraps the original exception
-						Assert.IsType<AggregateException>(capturedException);
-						Debug.Assert(capturedException != null);
-						actualException = ((AggregateException)capturedException).InnerException;
-					} else {
-						// capturedException should be an unwrapped exception
-						actualException = capturedException;
-					}
-					Assert.Equal(exception, actualException);
-					Debug.Assert(actualException != null);
-					// The source of the exception should not be one when it was rethrown but the original one. 
-					Assert.Equal(TestingAction.ExceptionSourceMethod, actualException.TargetSite);
-
-					if (additionalAsserts != null) {
-						additionalAsserts(target);
-					}
-				}
-
-				protected void Test_Running_CanceledWithException(bool passThroughAggregateException, Action<TTarget>? additionalAsserts = null) {
-					using (CancellationTokenSource cancellationTokenSource = new CancellationTokenSource()) {
-						// arrange
-						PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: true);
+					using (PausableTestingAction sampleAction = new PausableTestingAction(exception)) {
 						Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
 						T result = GetResult();
-						TTask task = GetPausableActionTask(sampleAction, cancellationTokenSource.Token, result);
+						TTask task = GetPausableActionTask(sampleAction, CancellationToken.None, result);
 						// The task should not finish at this point.
 						sampleAction.WaitForPause();
 						Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
@@ -275,13 +233,12 @@ namespace Zafu.Tasks.Tests {
 						TTarget target = GetTarget(task);
 
 						// act
-						cancellationTokenSource.Cancel();
 						(T actualResult, Exception? capturedException) = CallSyncOnAnotherThread(target, passThroughAggregateException, sampleAction);
 						task.WaitForCompletion();
 						Debug.Assert(task.IsCompleted);
 
 						// assert
-						// Works.Worked should not be done due to the cancellation.
+						// Works.Worked should not be done due to the exception.
 						Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
 
 						Exception? actualException;
@@ -294,7 +251,10 @@ namespace Zafu.Tasks.Tests {
 							// capturedException should be an unwrapped exception
 							actualException = capturedException;
 						}
-						Assert.IsAssignableFrom<OperationCanceledException>(actualException);
+						Assert.Equal(exception, actualException);
+						Debug.Assert(actualException != null);
+						// The source of the exception should not be one when it was rethrown but the original one. 
+						Assert.Equal(TestingAction.ExceptionSourceMethod, actualException.TargetSite);
 
 						if (additionalAsserts != null) {
 							additionalAsserts(target);
@@ -302,32 +262,76 @@ namespace Zafu.Tasks.Tests {
 					}
 				}
 
-				protected void Test_Running_CanceledVoluntary(Action<TTarget>? additionalAsserts = null) {
+				protected void Test_Running_CanceledWithException(bool passThroughAggregateException, Action<TTarget>? additionalAsserts = null) {
 					using (CancellationTokenSource cancellationTokenSource = new CancellationTokenSource()) {
 						// arrange
-						PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: false);
-						Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+						using (PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: true)) {
+							Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
 
-						T result = GetResult();
-						TTask task = GetPausableActionTask(sampleAction, cancellationTokenSource.Token, result);
-						// The task should not finish at this point.
-						sampleAction.WaitForPause();
-						Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+							T result = GetResult();
+							TTask task = GetPausableActionTask(sampleAction, cancellationTokenSource.Token, result);
+							// The task should not finish at this point.
+							sampleAction.WaitForPause();
+							Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
 
-						TTarget target = GetTarget(task);
+							TTarget target = GetTarget(task);
 
-						// act
-						cancellationTokenSource.Cancel();
-						(T actualResult, Exception? capturedException) = CallSyncOnAnotherThread(target, false, sampleAction);
-						task.WaitForCompletion();
-						Debug.Assert(task.IsCompleted);
+							// act
+							cancellationTokenSource.Cancel();
+							(T actualResult, Exception? capturedException) = CallSyncOnAnotherThread(target, passThroughAggregateException, sampleAction);
+							task.WaitForCompletion();
+							Debug.Assert(task.IsCompleted);
 
-						// assert
-						// Works.Worked should not be done due to the cancellation.
-						Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
-						Assert.Equal(result, actualResult);
-						if (additionalAsserts != null) {
-							additionalAsserts(target);
+							// assert
+							// Works.Worked should not be done due to the cancellation.
+							Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+
+							Exception? actualException;
+							if (passThroughAggregateException) {
+								// capturedException should be an AggregateException which wraps the original exception
+								Assert.IsType<AggregateException>(capturedException);
+								Debug.Assert(capturedException != null);
+								actualException = ((AggregateException)capturedException).InnerException;
+							} else {
+								// capturedException should be an unwrapped exception
+								actualException = capturedException;
+							}
+							Assert.IsAssignableFrom<OperationCanceledException>(actualException);
+
+							if (additionalAsserts != null) {
+								additionalAsserts(target);
+							}
+						}
+					}
+				}
+
+				protected void Test_Running_CanceledVoluntarily(Action<TTarget>? additionalAsserts = null) {
+					using (CancellationTokenSource cancellationTokenSource = new CancellationTokenSource()) {
+						// arrange
+						using (PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: false)) {
+							Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+
+							T result = GetResult();
+							TTask task = GetPausableActionTask(sampleAction, cancellationTokenSource.Token, result);
+							// The task should not finish at this point.
+							sampleAction.WaitForPause();
+							Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+
+							TTarget target = GetTarget(task);
+
+							// act
+							cancellationTokenSource.Cancel();
+							(T actualResult, Exception? capturedException) = CallSyncOnAnotherThread(target, false, sampleAction);
+							task.WaitForCompletion();
+							Debug.Assert(task.IsCompleted);
+
+							// assert
+							// Works.Worked should not be done due to the cancellation.
+							Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+							Assert.Equal(result, actualResult);
+							if (additionalAsserts != null) {
+								additionalAsserts(target);
+							}
 						}
 					}
 				}
@@ -465,9 +469,9 @@ namespace Zafu.Tasks.Tests {
 					);
 				}
 
-				[Fact(DisplayName = "running; canceled voluntary")]
+				[Fact(DisplayName = "running; canceled voluntarily")]
 				public void Running_CanceledVoluntary() {
-					Test_Running_CanceledVoluntary(additionalAsserts: (task) => {
+					Test_Running_CanceledVoluntarily(additionalAsserts: (task) => {
 						Assert.True(task.IsCompletedSuccessfully);
 					});
 				}
@@ -613,9 +617,9 @@ namespace Zafu.Tasks.Tests {
 					);
 				}
 
-				[Fact(DisplayName = "running; canceled voluntary")]
+				[Fact(DisplayName = "running; canceled voluntarily")]
 				public void Running_CanceledVoluntary() {
-					Test_Running_CanceledVoluntary(additionalAsserts: (valueTask) => {
+					Test_Running_CanceledVoluntarily(additionalAsserts: (valueTask) => {
 						Assert.True(valueTask.IsCompletedSuccessfully);
 					});
 				}
@@ -719,9 +723,9 @@ namespace Zafu.Tasks.Tests {
 					);
 				}
 
-				[Fact(DisplayName = "running; canceled voluntary")]
-				public void Running_CanceledVoluntary() {
-					Test_Running_CanceledVoluntary(additionalAsserts: (task) => {
+				[Fact(DisplayName = "running; canceled voluntarily")]
+				public void Running_CanceledVoluntarily() {
+					Test_Running_CanceledVoluntarily(additionalAsserts: (task) => {
 						Assert.True(task.IsCompletedSuccessfully);
 					});
 				}
@@ -856,9 +860,9 @@ namespace Zafu.Tasks.Tests {
 					);
 				}
 
-				[Fact(DisplayName = "running; canceled voluntary")]
-				public void Running_CanceledVoluntary() {
-					Test_Running_CanceledVoluntary(additionalAsserts: (valueTask) => {
+				[Fact(DisplayName = "running; canceled voluntarily")]
+				public void Running_CanceledVoluntarily() {
+					Test_Running_CanceledVoluntarily(additionalAsserts: (valueTask) => {
 						Assert.True(valueTask.IsCompletedSuccessfully);
 					});
 				}
