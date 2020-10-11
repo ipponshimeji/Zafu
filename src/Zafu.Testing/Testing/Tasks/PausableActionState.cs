@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Zafu.Disposing;
 
 namespace Zafu.Testing.Tasks {
 	public class PausableActionState: TestingActionState, IDisposable {
@@ -21,15 +22,8 @@ namespace Zafu.Testing.Tasks {
 
 		public void Dispose() {
 			// dispose the events
-			static void dispose(ref AutoResetEvent? evt) {
-				AutoResetEvent? oldValue = Interlocked.Exchange(ref evt, null);
-				if (oldValue != null) {
-					oldValue.Dispose();
-				}
-			}
-
-			dispose(ref this.resumeEvent);
-			dispose(ref this.pausedEvent);
+			DisposingUtil.ClearDisposableLoggingException(ref this.resumeEvent);
+			DisposingUtil.ClearDisposableLoggingException(ref this.pausedEvent);
 		}
 
 		#endregion
@@ -86,10 +80,10 @@ namespace Zafu.Testing.Tasks {
 
 		#region actions
 
-		public void PausableAction(CancellationToken cancellationToken) {
+		public void Action(CancellationToken cancellationToken) {
 			// check state
+			EnsureNoneProgress();
 			(AutoResetEvent pausedEvent, AutoResetEvent resumeEvent) = EnsureNotDisposed();
-			Debug.Assert(this.Progress == Works.None);
 
 			// start
 			Done(Works.Started);
@@ -110,27 +104,16 @@ namespace Zafu.Testing.Tasks {
 			}
 		}
 
-		public Task GetPausableActionTask(CancellationToken cancellationToken) {
-			return Task.Run(() => this.PausableAction(cancellationToken), cancellationToken);
+		public void UncancellableAction() {
+			Action(CancellationToken.None);
 		}
 
-		public Task<T> GetPausableActionTask<T>(CancellationToken cancellationToken, T result) {
-			return Task<T>.Run(() => {
-				this.PausableAction(cancellationToken);
-				return result;
-			}, cancellationToken);
+		public Task GetActionTask(CancellationToken cancellationToken) {
+			return Task.Run(() => this.Action(cancellationToken), cancellationToken);
 		}
 
-		public ValueTask GetPausableActionValueTask(CancellationToken cancellationToken) {
-			return new ValueTask(GetPausableActionTask(cancellationToken));
-		}
-
-		public ValueTask<T> GetPausableActionValueTask<T>(CancellationToken cancellationToken, T result) {
-			return new ValueTask<T>(GetPausableActionTask<T>(cancellationToken, result));
-		}
-
-		public void UncancellablePausableAction() {
-			PausableAction(CancellationToken.None);
+		public Task<T> GetActionTask<T>(CancellationToken cancellationToken, T result) {
+			return Task<T>.Run(() => { this.Action(cancellationToken); return result; }, cancellationToken);
 		}
 
 		#endregion

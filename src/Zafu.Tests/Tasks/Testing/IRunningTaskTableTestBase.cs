@@ -168,7 +168,6 @@ namespace Zafu.Tasks.Testing {
 				Thread.Sleep(100);
 			}
 
-			// resume the sampleAction
 			return workingTask;
 		}
 
@@ -189,9 +188,9 @@ namespace Zafu.Tasks.Testing {
 		[Fact(DisplayName = "Count")]
 		public void Count() {
 			// arrange
-			using (PausableActionState sampleAction1 = new PausableActionState()) {
-				using (PausableActionState sampleAction2 = new PausableActionState()) {
-					using (PausableActionState sampleAction3 = new PausableActionState()) {
+			using (PausableActionState actionState1 = new PausableActionState()) {
+				using (PausableActionState actionState2 = new PausableActionState()) {
+					using (PausableActionState actionState3 = new PausableActionState()) {
 						TTarget target = CreateTarget();
 						try {
 							IRunningTaskMonitor taskMonitor = target.RunningTaskMonitor;
@@ -199,32 +198,32 @@ namespace Zafu.Tasks.Testing {
 							// act & assert
 
 							// run task1
-							IRunningTask runningTask1 = taskMonitor.MonitorTask(sampleAction1.UncancellablePausableAction);
-							sampleAction1.WaitForPause();
+							IRunningTask runningTask1 = taskMonitor.MonitorTask(actionState1.UncancellableAction);
+							actionState1.WaitForPause();
 							Assert.Equal(1, target.RunningTaskCount);
 
 							// run task2
-							IRunningTask runningTask2 = taskMonitor.MonitorTask(sampleAction2.UncancellablePausableAction);
-							sampleAction2.WaitForPause();
+							IRunningTask runningTask2 = taskMonitor.MonitorTask(actionState2.UncancellableAction);
+							actionState2.WaitForPause();
 							Assert.Equal(2, target.RunningTaskCount);
 
 							// complete task2
-							sampleAction2.Resume();
+							actionState2.Resume();
 							runningTask2.WaitForCompletion();
 							Assert.Equal(1, target.RunningTaskCount);
 
 							// run task3
-							IRunningTask runningTask3 = taskMonitor.MonitorTask(sampleAction3.UncancellablePausableAction);
-							sampleAction3.WaitForPause();
+							IRunningTask runningTask3 = taskMonitor.MonitorTask(actionState3.UncancellableAction);
+							actionState3.WaitForPause();
 							Assert.Equal(2, target.RunningTaskCount);
 
 							// complete task1
-							sampleAction1.Resume();
+							actionState1.Resume();
 							runningTask1.WaitForCompletion();
 							Assert.Equal(1, target.RunningTaskCount);
 
 							// complete task3
-							sampleAction3.Resume();
+							actionState3.Resume();
 							runningTask3.WaitForCompletion();
 							Assert.Equal(0, target.RunningTaskCount);
 
@@ -250,12 +249,12 @@ namespace Zafu.Tasks.Testing {
 			}
 
 			// arrange
-			TestingActionState sampleAction = new TestingActionState();
+			SimpleActionState actionState = new SimpleActionState();
 			TTarget target = CreateTarget();
 			try {
 				// run a task
 				IRunningTaskMonitor taskMonitor = target.RunningTaskMonitor;
-				IRunningTask runningTask = taskMonitor.MonitorTask(sampleAction.SimpleAction);
+				IRunningTask runningTask = taskMonitor.MonitorTask(actionState.UncancellableAction);
 				runningTask.WaitForCompletion();
 				Debug.Assert(target.RunningTaskCount == 0);
 
@@ -266,7 +265,7 @@ namespace Zafu.Tasks.Testing {
 				// assert
 				Assert.True(actualCompleted);
 				Assert.Equal(0, actualCount);
-				Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
+				Assert.Equal(TestingActionState.Works.All, actionState.Progress);
 				// run additional routine assertion
 				AssertTarget(target);
 			} finally {
@@ -283,19 +282,19 @@ namespace Zafu.Tasks.Testing {
 			}
 
 			// arrange
-			using (PausableActionState sampleAction = new PausableActionState()) {
+			using (PausableActionState actionState = new PausableActionState()) {
 				TTarget target = CreateTarget();
 				try {
 					// run a task
 					IRunningTaskMonitor taskMonitor = target.RunningTaskMonitor;
-					IRunningTask runningTask = taskMonitor.MonitorTask(sampleAction.UncancellablePausableAction);
+					IRunningTask runningTask = taskMonitor.MonitorTask(actionState.UncancellableAction);
 
-					sampleAction.WaitForPause();
+					actionState.WaitForPause();
 					Debug.Assert(target.RunningTaskCount == 1);
 
 					// act
 					Task<(bool, int)> disposeTask = CallDisposeOnAnotherThread(target, sample);
-					sampleAction.Resume();
+					actionState.Resume();
 					runningTask.WaitForCompletion();
 					(bool actualCompleted, int actualCount) = disposeTask.Sync();
 
@@ -307,7 +306,7 @@ namespace Zafu.Tasks.Testing {
 						Assert.True(actualCompleted);
 						Assert.Equal(0, actualCount);
 					}
-					Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
+					Assert.Equal(TestingActionState.Works.All, actionState.Progress);
 					// run additional routine assertion
 					AssertTarget(target);
 				} finally {
@@ -325,12 +324,12 @@ namespace Zafu.Tasks.Testing {
 			}
 
 			// arrange
-			TestingActionState sampleAction = new TestingActionState();
+			CancellableActionState actionState = new CancellableActionState();
 			TTarget target = CreateTarget();
 			try {
 				// run a task
 				IRunningTaskMonitor taskMonitor = target.RunningTaskMonitor;
-				IRunningTask runningTask = taskMonitor.MonitorTask(sampleAction.CancellableAction);
+				IRunningTask runningTask = taskMonitor.MonitorTask(actionState.Action);
 				Debug.Assert(target.RunningTaskCount == 1);
 
 				// act
@@ -350,7 +349,7 @@ namespace Zafu.Tasks.Testing {
 					Assert.Equal(0, actualCount);
 				}
 				// Works.Worked should not be done due to the cancellation.
-				Assert.Equal(TestingActionState.Works.Terminated, sampleAction.Progress);
+				Assert.Equal(TestingActionState.Works.Terminated, actionState.Progress);
 				// run additional routine assertion
 				AssertTarget(target);
 			} finally {
@@ -367,27 +366,27 @@ namespace Zafu.Tasks.Testing {
 			}
 
 			// arrange
-			using (PausableActionState sampleAction = new PausableActionState(throwOnCancellation: false)) {
+			using (PausableActionState actionState = new PausableActionState(throwOnCancellation: false)) {
 				TTarget target = CreateTarget();
 				try {
 					// run a task
 					IRunningTaskMonitor taskMonitor = target.RunningTaskMonitor;
-					IRunningTask runningTask = taskMonitor.MonitorTask(sampleAction.UncancellablePausableAction);
+					IRunningTask runningTask = taskMonitor.MonitorTask(actionState.UncancellableAction);
 
-					sampleAction.WaitForPause();
+					actionState.WaitForPause();
 					Debug.Assert(target.RunningTaskCount == 1);
 
 					// act
 					Task<(bool, int)> workingTask = CallDisposeOnAnotherThread(target, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100));
 					(bool actualCompleted, int actualCount) = workingTask.Sync();
 
-					sampleAction.Resume();
+					actionState.Resume();
 					runningTask.WaitForCompletion();
 
 					// assert
 					Assert.False(actualCompleted);  // should be timeouted
 					Assert.Equal(1, actualCount);
-					Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
+					Assert.Equal(TestingActionState.Works.All, actionState.Progress);
 					// run additional routine assertion
 					AssertTarget(target);
 				} finally {
@@ -416,29 +415,29 @@ namespace Zafu.Tasks.Testing {
 				expectedCount = 1;
 			}
 
-			TestingActionState sampleAction_cancelling = new TestingActionState();
-			using (PausableActionState sampleAction_waiting = new PausableActionState()) {
-				using (PausableActionState sampleAction_uncancellable = new PausableActionState()) {
+			CancellableActionState actionState_cancelling = new CancellableActionState();
+			using (PausableActionState actionState_waiting = new PausableActionState()) {
+				using (PausableActionState actionState_uncancellable = new PausableActionState()) {
 					TTarget target = CreateTarget();
 					try {
 						// run three tasks
 						IRunningTaskMonitor taskMonitor = target.RunningTaskMonitor;
-						IRunningTask runningTask_waiting = taskMonitor.MonitorTask(sampleAction_waiting.UncancellablePausableAction);
-						IRunningTask runningTask_cancelling = taskMonitor.MonitorTask(sampleAction_cancelling.CancellableAction);
-						IRunningTask runningTask_uncancellable = taskMonitor.MonitorTask(sampleAction_uncancellable.UncancellablePausableAction);
+						IRunningTask runningTask_waiting = taskMonitor.MonitorTask(actionState_waiting.UncancellableAction);
+						IRunningTask runningTask_cancelling = taskMonitor.MonitorTask(actionState_cancelling.Action);
+						IRunningTask runningTask_uncancellable = taskMonitor.MonitorTask(actionState_uncancellable.UncancellableAction);
 
-						sampleAction_waiting.WaitForPause();
-						sampleAction_uncancellable.WaitForPause();
+						actionState_waiting.WaitForPause();
+						actionState_uncancellable.WaitForPause();
 						Debug.Assert(target.RunningTaskCount == 3);
 
 						// act
 						Task<(bool, int)> workingTask = CallDisposeOnAnotherThread(target, sample);
-						sampleAction_waiting.Resume();
+						actionState_waiting.Resume();
 						(bool actualCompleted, int actualCount) = workingTask.Sync();
 						if (runningTask_cancelling.IsCancellationRequested == false) {
 							runningTask_cancelling.Cancel();
 						}
-						sampleAction_uncancellable.Resume();
+						actionState_uncancellable.Resume();
 
 						runningTask_waiting.WaitForCompletion();
 						runningTask_cancelling.WaitForCompletion();
@@ -447,9 +446,9 @@ namespace Zafu.Tasks.Testing {
 						// assert
 						Assert.False(actualCompleted);
 						Assert.Equal(expectedCount, actualCount);
-						Assert.Equal(TestingActionState.Works.All, sampleAction_waiting.Progress);
-						Assert.Equal(TestingActionState.Works.Terminated, sampleAction_cancelling.Progress);
-						Assert.Equal(TestingActionState.Works.All, sampleAction_uncancellable.Progress);
+						Assert.Equal(TestingActionState.Works.All, actionState_waiting.Progress);
+						Assert.Equal(TestingActionState.Works.Terminated, actionState_cancelling.Progress);
+						Assert.Equal(TestingActionState.Works.All, actionState_uncancellable.Progress);
 						// run additional routine assertion
 						AssertTarget(target);
 					} finally {
@@ -462,12 +461,12 @@ namespace Zafu.Tasks.Testing {
 		[Fact(DisplayName = "Dispose; IDisposable.Dispose")]
 		public void Dispose_IDisposable() {
 			// arrange
-			TestingActionState sampleAction = new TestingActionState();
+			CancellableActionState actionState = new CancellableActionState();
 			TTarget target = CreateTarget();
 			try {
 				// run a task
 				IRunningTaskMonitor taskMonitor = target.RunningTaskMonitor;
-				IRunningTask runningTask = taskMonitor.MonitorTask(sampleAction.CancellableAction);
+				IRunningTask runningTask = taskMonitor.MonitorTask(actionState.Action);
 				Debug.Assert(target.RunningTaskCount == 1);
 
 				// act
@@ -481,7 +480,7 @@ namespace Zafu.Tasks.Testing {
 				// assert
 				Assert.Equal(0, actualCount);
 				// Works.Worked should not be done due to the cancellation.
-				Assert.Equal(TestingActionState.Works.Terminated, sampleAction.Progress);
+				Assert.Equal(TestingActionState.Works.Terminated, actionState.Progress);
 				// run additional routine assertion
 				AssertTarget(target);
 			} finally {

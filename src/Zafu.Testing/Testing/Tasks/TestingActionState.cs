@@ -5,6 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace Zafu.Testing.Tasks {
+	/// <summary>
+	/// The base class for classes which provide usable actions for test.
+	/// </summary>
 	public class TestingActionState {
 		#region types
 
@@ -35,6 +38,7 @@ namespace Zafu.Testing.Tasks {
 
 		private static MethodInfo? exceptionSourceMethod = null;
 
+
 		public readonly Exception? Exception;
 
 		public readonly bool ThrowOnCancellation;
@@ -52,10 +56,10 @@ namespace Zafu.Testing.Tasks {
 				if (value == null) {
 					BindingFlags flags = (
 						BindingFlags.DeclaredOnly |
-						BindingFlags.Instance |
+						BindingFlags.Static |
 						BindingFlags.NonPublic
 					);
-					MethodInfo? temp = typeof(TestingActionState).GetMethod("Work", flags);
+					MethodInfo? temp = typeof(TestingActionState).GetMethod("ThrowException", flags);
 					if (temp == null) {
 						// unexpected state; the implementation was broken
 						throw new NotSupportedException();
@@ -74,7 +78,7 @@ namespace Zafu.Testing.Tasks {
 
 		#region creation
 
-		public TestingActionState(Exception? exception = null, bool throwOnCancellation = false) {
+		protected TestingActionState(Exception? exception, bool throwOnCancellation) {
 			// check argument
 			// exception can be null
 
@@ -102,12 +106,19 @@ namespace Zafu.Testing.Tasks {
 			this.Progress |= work;
 		}
 
+		protected void EnsureNoneProgress() {
+			// check state
+			if (this.Progress != Works.None) {
+				throw new InvalidOperationException("Another action has been called on this state.");
+			}
+		}
+
 		protected bool Work(CancellationToken cancellationToken) {
 			bool cancellationRequested = false;
 
 			// do 'Work' according to its settings.
 			if (this.Exception != null) {
-				throw this.Exception;
+				ThrowException(this.Exception);
 			} else if (cancellationToken.CanBeCanceled) {
 				if (this.ThrowOnCancellation) {
 					cancellationToken.ThrowIfCancellationRequested();
@@ -119,81 +130,19 @@ namespace Zafu.Testing.Tasks {
 			return cancellationRequested;
 		}
 
-		#endregion
-
-
-		#region actions - simple action
-
-		public void SimpleAction(CancellationToken cancellationToken) {
-			// check state
-			Debug.Assert(this.Progress == Works.None);
-
-			// do work
-			Done(Works.Started);
-			try {
-				// Note that Works.Worked is not done 
-				// if the execution is terminated by an execption or cancellation.
-				if (Work(cancellationToken)) {
-					return;
-				}
-				Done(Works.Worked);
-			} finally {
-				Done(Works.Finished);
-			}
-		}
-
-		public void SimpleAction() {
-			SimpleAction(CancellationToken.None);
-		}
-
-		public Task GetSimpleActionTask(CancellationToken cancellationToken) {
-			return Task.Run(() => this.SimpleAction(cancellationToken), cancellationToken);
-		}
-
-		public Task<T> GetSimpleActionTask<T>(CancellationToken cancellationToken, T result) {
-			return Task<T>.Run(() => {
-				this.SimpleAction(cancellationToken);
-				return result;
-			}, cancellationToken);
-		}
-
-		public ValueTask GetSimpleActionValueTask(CancellationToken cancellationToken) {
-			return new ValueTask(GetSimpleActionTask(cancellationToken));
-		}
-
-		public ValueTask<T> GetSimpleActionValueTask<T>(CancellationToken cancellationToken, T result) {
-			return new ValueTask<T>(GetSimpleActionTask<T>(cancellationToken, result));
-		}
-
-		#endregion
-
-
-		#region actions - cancellable action
-
-		public void CancellableAction(CancellationToken cancellationToken) {
+		/// <summary>
+		/// Throws the given exception.
+		/// This method is used to set TargetSite property of the thrown exception to this method.
+		/// </summary>
+		/// <param name="exception"></param>
+		/// <seealso cref="ExceptionSourceMethod"/>
+		protected static void ThrowException(Exception exception) {
 			// check argument
-			if (cancellationToken.CanBeCanceled == false) {
-				// cancellationToken must be cancellable,
-				// because cancellation with it is the only way to return this method successfully.
-				throw new ArgumentException("It must be cancellable.", nameof(cancellationToken));
+			if (exception == null) {
+				throw new ArgumentNullException(nameof(exception));
 			}
 
-			// check state
-			Debug.Assert(this.Progress == Works.None);
-
-			// do work
-			Done(Works.Started);
-			try {
-				// wait for cancellation
-				bool canceled = cancellationToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(10));
-				if (canceled) {
-					return;
-				}
-
-				Done(Works.Worked);
-			} finally {
-				Done(Works.Finished);
-			}
+			throw exception;
 		}
 
 		#endregion
