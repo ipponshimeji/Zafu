@@ -174,8 +174,8 @@ namespace Zafu.Tasks.Testing {
 		[Fact(DisplayName = "simple action; successful")]
 		public void SimpleAction_Successful() {
 			// arrange
-			TestingAction sampleAction = new TestingAction();
-			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+			TestingActionState sampleAction = new TestingActionState();
+			Debug.Assert(sampleAction.Progress == TestingActionState.Works.None);
 
 			TTarget target = CreateTarget();
 			try {
@@ -188,7 +188,7 @@ namespace Zafu.Tasks.Testing {
 
 				// assert
 				// All works should be done.
-				Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+				Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
 				Assert.True(runningTask.Task.IsCompletedSuccessfully);
 				// run additional routine assertion
 				AssertTarget(target);
@@ -201,8 +201,8 @@ namespace Zafu.Tasks.Testing {
 		public void SimpleAction_Exception() {
 			// arrange
 			InvalidOperationException exception = new InvalidOperationException();
-			TestingAction sampleAction = new TestingAction(exception);
-			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+			TestingActionState sampleAction = new TestingActionState(exception);
+			Debug.Assert(sampleAction.Progress == TestingActionState.Works.None);
 
 			TTarget target = CreateTarget();
 			try {
@@ -215,7 +215,7 @@ namespace Zafu.Tasks.Testing {
 
 				// assert
 				// Works.Worked should not be done due to the exception.
-				Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+				Assert.Equal(TestingActionState.Works.Terminated, sampleAction.Progress);
 				AssertExceptionOnTask(exception, runningTask.Task);
 				// run additional routine assertion
 				AssertTarget(target);
@@ -227,8 +227,8 @@ namespace Zafu.Tasks.Testing {
 		[Fact(DisplayName = "simple action; try to cancel")]
 		public void SimpleAction_TryToCancel() {
 			// arrange
-			using (PausableTestingAction sampleAction = new PausableTestingAction()) {
-				Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+			using (PausableActionState sampleAction = new PausableActionState()) {
+				Debug.Assert(sampleAction.Progress == TestingActionState.Works.None);
 
 				TTarget target = CreateTarget();
 				try {
@@ -239,7 +239,7 @@ namespace Zafu.Tasks.Testing {
 					Debug.Assert(runningTask != null);
 
 					sampleAction.WaitForPause();
-					Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+					Debug.Assert(sampleAction.Progress == PausableActionState.Works.Started);
 					runningTask.Cancel();
 					sampleAction.Resume();
 
@@ -248,7 +248,7 @@ namespace Zafu.Tasks.Testing {
 					// assert
 					// All works should be done.
 					// The runningTask.Cancel() does not work in this case.
-					Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+					Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
 					Assert.True(runningTask.Task.IsCompletedSuccessfully);
 					// run additional routine assertion
 					AssertTarget(target);
@@ -281,8 +281,8 @@ namespace Zafu.Tasks.Testing {
 
 		protected void Test_CancellableAction_Successful(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
 			// arrange
-			TestingAction sampleAction = new TestingAction();
-			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+			TestingActionState sampleAction = new TestingActionState();
+			Debug.Assert(sampleAction.Progress == TestingActionState.Works.None);
 
 			TTarget target = CreateTarget();
 			try {
@@ -295,7 +295,7 @@ namespace Zafu.Tasks.Testing {
 
 				// assert
 				// All works should be done.
-				Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+				Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
 				Assert.True(runningTask.Task.IsCompletedSuccessfully);
 				// run additional routine assertion
 				AssertTarget(target);
@@ -313,8 +313,8 @@ namespace Zafu.Tasks.Testing {
 		public void Test_CancellableAction_Exception(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
 			// arrange
 			InvalidOperationException exception = new InvalidOperationException();
-			TestingAction sampleAction = new TestingAction(exception);
-			Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+			TestingActionState sampleAction = new TestingActionState(exception);
+			Debug.Assert(sampleAction.Progress == TestingActionState.Works.None);
 
 			TTarget target = CreateTarget();
 			try {
@@ -327,7 +327,7 @@ namespace Zafu.Tasks.Testing {
 
 				// assert
 				// Works.Worked should not be done due to the exception.
-				Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+				Assert.Equal(TestingActionState.Works.Terminated, sampleAction.Progress);
 				AssertExceptionOnTask(exception, runningTask.Task);
 				// run additional routine assertion
 				AssertTarget(target);
@@ -344,8 +344,8 @@ namespace Zafu.Tasks.Testing {
 
 		protected void Test_CancellableAction_CanceledVoluntarily(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
 			// arrange
-			using (PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: false)) {
-				Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+			using (PausableActionState sampleAction = new PausableActionState(throwOnCancellation: false)) {
+				Debug.Assert(sampleAction.Progress == TestingActionState.Works.None);
 
 				TTarget target = CreateTarget();
 				try {
@@ -356,7 +356,7 @@ namespace Zafu.Tasks.Testing {
 					Debug.Assert(runningTask != null);
 
 					sampleAction.WaitForPause();
-					Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+					Debug.Assert(sampleAction.Progress == PausableActionState.Works.Started);
 					runningTask.Cancel();
 					sampleAction.Resume();
 
@@ -366,7 +366,7 @@ namespace Zafu.Tasks.Testing {
 					// Works.Worked should not be done due to the cancellation.
 					// Note that Cancel() works even if the cancellationTokenSource is null,
 					// because a CancellationTokenSource is created in MonitorTask() in that case.
-					Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+					Assert.Equal(TestingActionState.Works.Terminated, sampleAction.Progress);
 					Assert.True(runningTask.Task.IsCompletedSuccessfully);
 					// run additional routine assertion
 					AssertTarget(target);
@@ -384,8 +384,8 @@ namespace Zafu.Tasks.Testing {
 
 		protected void Test_CancellableAction_CanceledWithException(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource) {
 			// arrange
-			using (PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: true)) {
-				Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+			using (PausableActionState sampleAction = new PausableActionState(throwOnCancellation: true)) {
+				Debug.Assert(sampleAction.Progress == TestingActionState.Works.None);
 
 				TTarget target = CreateTarget();
 				try {
@@ -396,7 +396,7 @@ namespace Zafu.Tasks.Testing {
 					Debug.Assert(runningTask != null);
 
 					sampleAction.WaitForPause();
-					Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+					Debug.Assert(sampleAction.Progress == PausableActionState.Works.Started);
 					runningTask.Cancel();
 					sampleAction.Resume();
 
@@ -406,7 +406,7 @@ namespace Zafu.Tasks.Testing {
 					// Works.Worked should not be done due to the cancellation.
 					// Note that Cancel() works even if the cancellationTokenSource is null,
 					// because a CancellationTokenSource is created in MonitorTask() in that case.
-					Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+					Assert.Equal(TestingActionState.Works.Terminated, sampleAction.Progress);
 					AssertCanceledExceptionOnTask(runningTask.Task);
 					// run additional routine assertion
 					AssertTarget(target);
@@ -555,15 +555,15 @@ namespace Zafu.Tasks.Testing {
 
 		public void Test_Task_Running_Successful(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask) {
 			// arrange
-			using (PausableTestingAction sampleAction = new PausableTestingAction()) {
-				Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+			using (PausableActionState sampleAction = new PausableActionState()) {
+				Debug.Assert(sampleAction.Progress == TestingActionState.Works.None);
 
 				TTarget target = CreateTarget();
 				try {
 					CancellationToken cancellationToken = (cancellationTokenSource != null) ? cancellationTokenSource.Token : CancellationToken.None;
 					Task task = sampleAction.GetPausableActionTask(cancellationToken);
 					sampleAction.WaitForPause();
-					Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+					Debug.Assert(sampleAction.Progress == PausableActionState.Works.Started);
 
 					// act
 					IRunningTask? runningTask = targetValueTask switch {
@@ -577,7 +577,7 @@ namespace Zafu.Tasks.Testing {
 
 					// assert
 					// All works should be done.
-					Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+					Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
 					Assert.True(task.IsCompletedSuccessfully);
 					Assert.True(runningTask.Task.IsCompletedSuccessfully);
 					// run additional routine assertion
@@ -603,15 +603,15 @@ namespace Zafu.Tasks.Testing {
 		protected void Test_Task_Running_Exception(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask) {
 			// arrange
 			Exception exception = new InvalidOperationException();
-			using (PausableTestingAction sampleAction = new PausableTestingAction(exception)) {
-				Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+			using (PausableActionState sampleAction = new PausableActionState(exception)) {
+				Debug.Assert(sampleAction.Progress == TestingActionState.Works.None);
 
 				TTarget target = CreateTarget();
 				try {
 					CancellationToken cancellationToken = (cancellationTokenSource != null) ? cancellationTokenSource.Token : CancellationToken.None;
 					Task task = sampleAction.GetPausableActionTask(cancellationToken);
 					sampleAction.WaitForPause();
-					Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+					Debug.Assert(sampleAction.Progress == PausableActionState.Works.Started);
 
 					// act
 					IRunningTask? runningTask = targetValueTask switch {
@@ -625,7 +625,7 @@ namespace Zafu.Tasks.Testing {
 
 					// assert
 					// Works.Worked should not be done due to the exception.
-					Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+					Assert.Equal(TestingActionState.Works.Terminated, sampleAction.Progress);
 					Assert.True(task.IsFaulted);
 					AssertExceptionOnTask(exception, runningTask.Task);
 					// run additional routine assertion
@@ -650,15 +650,15 @@ namespace Zafu.Tasks.Testing {
 
 		protected void Test_Task_Running_CanceledWithException(CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask) {
 			// arrange
-			using (PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: true)) {
-				Debug.Assert(sampleAction.Progress == TestingAction.Works.None);
+			using (PausableActionState sampleAction = new PausableActionState(throwOnCancellation: true)) {
+				Debug.Assert(sampleAction.Progress == TestingActionState.Works.None);
 
 				TTarget target = CreateTarget();
 				try {
 					CancellationToken cancellationToken = (cancellationTokenSource != null) ? cancellationTokenSource.Token : CancellationToken.None;
 					Task task = sampleAction.GetPausableActionTask(cancellationToken);
 					sampleAction.WaitForPause();
-					Debug.Assert(sampleAction.Progress == PausableTestingAction.Works.Started);
+					Debug.Assert(sampleAction.Progress == PausableActionState.Works.Started);
 
 					// act
 					IRunningTask? runningTask = targetValueTask switch {
@@ -674,12 +674,12 @@ namespace Zafu.Tasks.Testing {
 					// assert
 					if (cancellationTokenSource == null) {
 						// All works should be done, because runningTask.Cancel() gave no effect.
-						Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+						Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
 						Assert.True(runningTask.Task.IsCompletedSuccessfully);
 					} else {
 						// Works.Worked should not be done due to the exception.
 						// Note that Works.Finished is not marked if whole the task is canceled.
-						Assert.Equal(0, sampleAction.Progress & TestingAction.Works.Worked);
+						Assert.Equal(0, sampleAction.Progress & TestingActionState.Works.Worked);
 						AssertCanceledExceptionOnTask(runningTask.Task);
 					}
 					// run additional routine assertion

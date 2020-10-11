@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace Zafu.Testing.Tasks {
-	public class PausableTestingAction: TestingAction, IDisposable {
+	public class PausableActionState: TestingActionState, IDisposable {
 		#region data
 
 		private AutoResetEvent? pausedEvent = new AutoResetEvent(false);
@@ -16,7 +16,7 @@ namespace Zafu.Testing.Tasks {
 
 		#region creation & disposal
 
-		public PausableTestingAction(Exception? exception = null, bool throwOnCancellation = false): base(exception, throwOnCancellation) {
+		public PausableActionState(Exception? exception = null, bool throwOnCancellation = false): base(exception, throwOnCancellation) {
 		}
 
 		public void Dispose() {

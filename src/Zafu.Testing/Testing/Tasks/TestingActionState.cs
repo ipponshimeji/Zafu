@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace Zafu.Testing.Tasks {
-	public class TestingAction {
+	public class TestingActionState {
 		#region types
 
 		public class Works {
@@ -55,7 +55,7 @@ namespace Zafu.Testing.Tasks {
 						BindingFlags.Instance |
 						BindingFlags.NonPublic
 					);
-					MethodInfo? temp = typeof(TestingAction).GetMethod("Work", flags);
+					MethodInfo? temp = typeof(TestingActionState).GetMethod("Work", flags);
 					if (temp == null) {
 						// unexpected state; the implementation was broken
 						throw new NotSupportedException();
@@ -74,7 +74,7 @@ namespace Zafu.Testing.Tasks {
 
 		#region creation
 
-		public TestingAction(Exception? exception = null, bool throwOnCancellation = false) {
+		public TestingActionState(Exception? exception = null, bool throwOnCancellation = false) {
 			// check argument
 			// exception can be null
 

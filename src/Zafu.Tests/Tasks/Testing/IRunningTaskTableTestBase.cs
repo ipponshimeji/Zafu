@@ -189,9 +189,9 @@ namespace Zafu.Tasks.Testing {
 		[Fact(DisplayName = "Count")]
 		public void Count() {
 			// arrange
-			using (PausableTestingAction sampleAction1 = new PausableTestingAction()) {
-				using (PausableTestingAction sampleAction2 = new PausableTestingAction()) {
-					using (PausableTestingAction sampleAction3 = new PausableTestingAction()) {
+			using (PausableActionState sampleAction1 = new PausableActionState()) {
+				using (PausableActionState sampleAction2 = new PausableActionState()) {
+					using (PausableActionState sampleAction3 = new PausableActionState()) {
 						TTarget target = CreateTarget();
 						try {
 							IRunningTaskMonitor taskMonitor = target.RunningTaskMonitor;
@@ -250,7 +250,7 @@ namespace Zafu.Tasks.Testing {
 			}
 
 			// arrange
-			TestingAction sampleAction = new TestingAction();
+			TestingActionState sampleAction = new TestingActionState();
 			TTarget target = CreateTarget();
 			try {
 				// run a task
@@ -266,7 +266,7 @@ namespace Zafu.Tasks.Testing {
 				// assert
 				Assert.True(actualCompleted);
 				Assert.Equal(0, actualCount);
-				Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+				Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
 				// run additional routine assertion
 				AssertTarget(target);
 			} finally {
@@ -283,7 +283,7 @@ namespace Zafu.Tasks.Testing {
 			}
 
 			// arrange
-			using (PausableTestingAction sampleAction = new PausableTestingAction()) {
+			using (PausableActionState sampleAction = new PausableActionState()) {
 				TTarget target = CreateTarget();
 				try {
 					// run a task
@@ -307,7 +307,7 @@ namespace Zafu.Tasks.Testing {
 						Assert.True(actualCompleted);
 						Assert.Equal(0, actualCount);
 					}
-					Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+					Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
 					// run additional routine assertion
 					AssertTarget(target);
 				} finally {
@@ -325,7 +325,7 @@ namespace Zafu.Tasks.Testing {
 			}
 
 			// arrange
-			TestingAction sampleAction = new TestingAction();
+			TestingActionState sampleAction = new TestingActionState();
 			TTarget target = CreateTarget();
 			try {
 				// run a task
@@ -350,7 +350,7 @@ namespace Zafu.Tasks.Testing {
 					Assert.Equal(0, actualCount);
 				}
 				// Works.Worked should not be done due to the cancellation.
-				Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+				Assert.Equal(TestingActionState.Works.Terminated, sampleAction.Progress);
 				// run additional routine assertion
 				AssertTarget(target);
 			} finally {
@@ -367,7 +367,7 @@ namespace Zafu.Tasks.Testing {
 			}
 
 			// arrange
-			using (PausableTestingAction sampleAction = new PausableTestingAction(throwOnCancellation: false)) {
+			using (PausableActionState sampleAction = new PausableActionState(throwOnCancellation: false)) {
 				TTarget target = CreateTarget();
 				try {
 					// run a task
@@ -387,7 +387,7 @@ namespace Zafu.Tasks.Testing {
 					// assert
 					Assert.False(actualCompleted);  // should be timeouted
 					Assert.Equal(1, actualCount);
-					Assert.Equal(TestingAction.Works.All, sampleAction.Progress);
+					Assert.Equal(TestingActionState.Works.All, sampleAction.Progress);
 					// run additional routine assertion
 					AssertTarget(target);
 				} finally {
@@ -416,9 +416,9 @@ namespace Zafu.Tasks.Testing {
 				expectedCount = 1;
 			}
 
-			TestingAction sampleAction_cancelling = new TestingAction();
-			using (PausableTestingAction sampleAction_waiting = new PausableTestingAction()) {
-				using (PausableTestingAction sampleAction_uncancellable = new PausableTestingAction()) {
+			TestingActionState sampleAction_cancelling = new TestingActionState();
+			using (PausableActionState sampleAction_waiting = new PausableActionState()) {
+				using (PausableActionState sampleAction_uncancellable = new PausableActionState()) {
 					TTarget target = CreateTarget();
 					try {
 						// run three tasks
@@ -447,9 +447,9 @@ namespace Zafu.Tasks.Testing {
 						// assert
 						Assert.False(actualCompleted);
 						Assert.Equal(expectedCount, actualCount);
-						Assert.Equal(TestingAction.Works.All, sampleAction_waiting.Progress);
-						Assert.Equal(TestingAction.Works.Terminated, sampleAction_cancelling.Progress);
-						Assert.Equal(TestingAction.Works.All, sampleAction_uncancellable.Progress);
+						Assert.Equal(TestingActionState.Works.All, sampleAction_waiting.Progress);
+						Assert.Equal(TestingActionState.Works.Terminated, sampleAction_cancelling.Progress);
+						Assert.Equal(TestingActionState.Works.All, sampleAction_uncancellable.Progress);
 						// run additional routine assertion
 						AssertTarget(target);
 					} finally {
@@ -462,7 +462,7 @@ namespace Zafu.Tasks.Testing {
 		[Fact(DisplayName = "Dispose; IDisposable.Dispose")]
 		public void Dispose_IDisposable() {
 			// arrange
-			TestingAction sampleAction = new TestingAction();
+			TestingActionState sampleAction = new TestingActionState();
 			TTarget target = CreateTarget();
 			try {
 				// run a task
@@ -481,7 +481,7 @@ namespace Zafu.Tasks.Testing {
 				// assert
 				Assert.Equal(0, actualCount);
 				// Works.Worked should not be done due to the cancellation.
-				Assert.Equal(TestingAction.Works.Terminated, sampleAction.Progress);
+				Assert.Equal(TestingActionState.Works.Terminated, sampleAction.Progress);
 				// run additional routine assertion
 				AssertTarget(target);
 			} finally {
