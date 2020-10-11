@@ -9,6 +9,8 @@ namespace Zafu.Tasks {
 
 		IRunningTaskMonitor RunningTaskMonitor { get; }
 
+		int RunningTaskCount { get; }
+
 		bool Dispose(TimeSpan waitingTimeout, TimeSpan cancelingTimeOut);
 	}
 }

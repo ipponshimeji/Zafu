@@ -26,11 +26,51 @@ namespace Zafu.Tasks.Tests {
 				// check argument
 				Debug.Assert(target != null);
 
-				Assert.Equal(0, target.Count);
+				Assert.Equal(0, target.RunningTaskCount);
 			}
 
 			#endregion
 		}
+
+		#endregion
+
+
+		#region IRunningTaskTable
+
+		public class IRunningTaskTableTest: IRunningTaskTableTestBase<RunningTaskTable> {
+			#region overrides
+
+			protected override RunningTaskTable CreateTarget() {
+				return new RunningTaskTable();
+			}
+
+			protected override void DisposeTarget(RunningTaskTable target) {
+				// check argument
+				Debug.Assert(target != null);
+
+				bool disposed = target.IsDisposed;
+				if (disposed == false) {
+					target.Dispose();
+				}
+			}
+
+			protected override void AssertTarget(RunningTaskTable target) {
+				// check argument
+				Debug.Assert(target != null);
+
+				Assert.Equal(0, target.RunningTaskCount);
+				Assert.True(target.IsDisposed);
+			}
+
+			#endregion
+		}
+
+		#endregion
+
+
+		#region logging
+
+		// TODO implement
 
 		#endregion
 	}

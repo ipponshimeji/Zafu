@@ -21,16 +21,7 @@ namespace Zafu.Tasks {
 
 		private readonly HashSet<RunningTask> runningTasks = new HashSet<RunningTask>();
 
-		#endregion
-
-
-		#region properties
-
-		public int Count {
-			get {
-				return this.runningTasks.Count;
-			}
-		}
+		private bool taskTableDisposed = false;
 
 		#endregion
 
@@ -44,10 +35,11 @@ namespace Zafu.Tasks {
 			return name ?? DefaultName;
 		}
 
-		protected override void Dispose(bool disposing) {
-			if (disposing) {
+		public override void Dispose() {
+			if (this.taskTableDisposed == false) {
 				Dispose(IRunningTaskTable.DefaultDisposeWaitingTimeout, IRunningTaskTable.DefaultDisposeCancelingTimeout);
 			}
+			base.Dispose();
 		}
 
 		#endregion
@@ -57,7 +49,18 @@ namespace Zafu.Tasks {
 
 		public virtual IRunningTaskMonitor RunningTaskMonitor => this;
 
+		public virtual int RunningTaskCount => this.runningTasks.Count;
+
 		public virtual bool Dispose(TimeSpan waitingTimeout, TimeSpan cancelingTimeOut) {
+			// check state
+			lock (this.InstanceLocker) {
+				if (this.taskTableDisposed) {
+					Debug.Assert(this.RunningTaskCount == 0);
+					return true;
+				}
+				this.taskTableDisposed = true;
+			}
+
 			// Note that waitingTimeout and cancelingTimeOut may be -1 millisecond, which means "infinite".
 			bool completed = false;
 			Task[] tasks;
@@ -71,7 +74,9 @@ namespace Zafu.Tasks {
 			}
 
 			// try to wait for completion of the current running tasks
-			if (waitingTimeout != TimeSpan.Zero) {
+			if (waitingTimeout == TimeSpan.Zero) {
+				completed = (this.RunningTaskCount == 0);
+			} else {
 				// get the current running tasks
 				lock (this.InstanceLocker) {
 					tasks = getTasks(this.runningTasks);
@@ -96,6 +101,9 @@ namespace Zafu.Tasks {
 				// wait for completion of the tasks
 				completed = waitForTasks(tasks, cancelingTimeOut);
 			}
+
+			// dispose this object
+			Dispose();
 
 			return completed;
 		}
@@ -302,7 +310,9 @@ namespace Zafu.Tasks {
 
 			lock (this.InstanceLocker) {
 				// check state
-				EnsureNotDisposed();
+				if (this.taskTableDisposed) {
+					throw CreateObjectDisposedException();
+				}
 
 				// register the running task to the running task table
 				Debug.Assert(this.runningTasks.Contains(runningTask) == false);

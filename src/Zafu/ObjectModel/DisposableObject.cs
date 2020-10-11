@@ -32,7 +32,7 @@ namespace Zafu.ObjectModel {
 		public DisposableObject(TRunningContext runningContext, string name) : base(runningContext, null, name) {
 		}
 
-		public void Dispose() {
+		public virtual void Dispose() {
 			lock (this.InstanceLocker) {
 				// check state
 				if (this.disposed == false) {

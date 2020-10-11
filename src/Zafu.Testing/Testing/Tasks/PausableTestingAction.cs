@@ -129,6 +129,10 @@ namespace Zafu.Testing.Tasks {
 			return new ValueTask<T>(GetPausableActionTask<T>(cancellationToken, result));
 		}
 
+		public void UncancellablePausableAction() {
+			PausableAction(CancellationToken.None);
+		}
+
 		#endregion
 	}
 }

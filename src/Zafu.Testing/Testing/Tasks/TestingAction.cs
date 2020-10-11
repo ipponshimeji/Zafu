@@ -122,7 +122,7 @@ namespace Zafu.Testing.Tasks {
 		#endregion
 
 
-		#region actions
+		#region actions - simple action
 
 		public void SimpleAction(CancellationToken cancellationToken) {
 			// check state
@@ -163,6 +163,37 @@ namespace Zafu.Testing.Tasks {
 
 		public ValueTask<T> GetSimpleActionValueTask<T>(CancellationToken cancellationToken, T result) {
 			return new ValueTask<T>(GetSimpleActionTask<T>(cancellationToken, result));
+		}
+
+		#endregion
+
+
+		#region actions - cancellable action
+
+		public void CancellableAction(CancellationToken cancellationToken) {
+			// check argument
+			if (cancellationToken.CanBeCanceled == false) {
+				// cancellationToken must be cancellable,
+				// because cancellation with it is the only way to return this method successfully.
+				throw new ArgumentException("It must be cancellable.", nameof(cancellationToken));
+			}
+
+			// check state
+			Debug.Assert(this.Progress == Works.None);
+
+			// do work
+			Done(Works.Started);
+			try {
+				// wait for cancellation
+				bool canceled = cancellationToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(10));
+				if (canceled) {
+					return;
+				}
+
+				Done(Works.Worked);
+			} finally {
+				Done(Works.Finished);
+			}
 		}
 
 		#endregion
