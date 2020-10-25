@@ -8,7 +8,7 @@ namespace Zafu.Tasks.Tests {
 	public class RunningTaskTableTest {
 		#region IRunningTaskMonitor
 
-		public class IRunningTaskMonitorTest: IRunningTaskMonitorTestBase<RunningTaskTable> {
+		public class IRunningTaskMonitorTest: IRunningTaskMonitorTest<RunningTaskTable> {
 			#region overrides
 
 			protected override RunningTaskTable CreateTarget() {

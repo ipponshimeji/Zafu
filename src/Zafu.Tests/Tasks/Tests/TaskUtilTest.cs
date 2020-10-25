@@ -150,40 +150,47 @@ namespace Zafu.Tasks.Tests {
 				protected void Test_Done_CanceledWithException(bool passThroughAggregateException, Action<TTarget>? additionalAsserts = null) {
 					using (CancellationTokenSource cancellationTokenSource = new CancellationTokenSource()) {
 						// arrange
-						SimpleActionState actionState = new SimpleActionState(throwOnCancellation: true);
-						Debug.Assert(actionState.Progress == TestingActionState.Works.None);
+						using (PausableActionState actionState = new PausableActionState(throwOnCancellation: true)) {
+							Debug.Assert(actionState.Progress == TestingActionState.Works.None);
 
-						cancellationTokenSource.Cancel();
-						T result = GetResult();
-						TTask task = GetSimpleActionTask(actionState, cancellationTokenSource.Token, result);
-						task.WaitForCompletion();
-						Debug.Assert(task.IsCanceled);   // task was canceled before it started
+							T result = GetResult();
+							TTask task = GetPausableActionTask(actionState, cancellationTokenSource.Token, result);
 
-						TTarget target = GetTarget(task);
+							// cancel the task
+							actionState.WaitForPause();
+							Debug.Assert(actionState.Progress == PausableActionState.Works.Started);
 
-						// act
-						Exception capturedException = Assert.ThrowsAny<Exception>(() => {
-							CallSync(target, passThroughAggregateException);
-						});
+							cancellationTokenSource.Cancel();
+							actionState.Resume();
+							task.WaitForCompletion();
+							Debug.Assert(task.IsCanceled);
 
-						// assert
-						// The task was canceled before it started.
-						Assert.Equal(TestingActionState.Works.None, actionState.Progress);
+							TTarget target = GetTarget(task);
 
-						Exception? actualException;
-						if (passThroughAggregateException) {
-							// capturedException should be an AggregateException which wraps the original exception
-							Assert.IsType<AggregateException>(capturedException);
-							Debug.Assert(capturedException != null);
-							actualException = ((AggregateException)capturedException).InnerException;
-						} else {
-							// capturedException should be the unwrapped exception
-							actualException = capturedException;
-						}
-						Assert.IsAssignableFrom<OperationCanceledException>(actualException);
+							// act
+							Exception capturedException = Assert.ThrowsAny<Exception>(() => {
+								CallSync(target, passThroughAggregateException);
+							});
 
-						if (additionalAsserts != null) {
-							additionalAsserts(target);
+							// assert
+							// Works.Worked should not be done due to the cancellation.
+							Assert.Equal(TestingActionState.Works.Terminated, actionState.Progress);
+
+							Exception? actualException;
+							if (passThroughAggregateException) {
+								// capturedException should be an AggregateException which wraps the original exception
+								Assert.IsType<AggregateException>(capturedException);
+								Debug.Assert(capturedException != null);
+								actualException = ((AggregateException)capturedException).InnerException;
+							} else {
+								// capturedException should be the unwrapped exception
+								actualException = capturedException;
+							}
+							Assert.IsAssignableFrom<OperationCanceledException>(actualException);
+
+							if (additionalAsserts != null) {
+								additionalAsserts(target);
+							}
 						}
 					}
 				}
