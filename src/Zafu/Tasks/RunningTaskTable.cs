@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -125,11 +126,13 @@ namespace Zafu.Tasks {
 				action: (RunningTask rt) => {
 					Debug.Assert(rt != null);
 					try {
-						action();
-						OnTaskFinishing(rt.Task, null);
-					} catch (Exception exception) {
-						OnTaskFinishing(rt.Task, exception);
-						throw;
+						try {
+							action();
+						} catch (Exception exception) {
+							OnTaskFinishing(rt, exception);
+							throw;
+						}
+						OnTaskFinishing(rt, null);
 					} finally {
 						UnregisterRunningTask(rt);
 					}
@@ -153,11 +156,13 @@ namespace Zafu.Tasks {
 				action: (RunningTask rt) => {
 					Debug.Assert(rt != null);
 					try {
-						action(rt.CancellationToken);
-						OnTaskFinishing(rt.Task, null);
-					} catch (Exception exception) {
-						OnTaskFinishing(rt.Task, exception);
-						throw;
+						try {
+							action(rt.CancellationToken);
+						} catch (Exception exception) {
+							OnTaskFinishing(rt, exception);
+							throw;
+						}
+						OnTaskFinishing(rt, null);
 					} finally {
 						UnregisterRunningTask(rt);
 					}
@@ -202,11 +207,13 @@ namespace Zafu.Tasks {
 				action: (RunningTask rt) => {
 					Debug.Assert(rt != null);
 					try {
-						task.Sync();
-						OnTaskFinishing(rt.Task, null);
-					} catch (Exception exception) {
-						OnTaskFinishing(rt.Task, exception);
-						throw;
+						try {
+							task.Sync();
+						} catch (Exception exception) {
+							OnTaskFinishing(rt, exception);
+							throw;
+						}
+						OnTaskFinishing(rt, null);
 					} finally {
 						UnregisterRunningTask(rt);
 					}
@@ -224,7 +231,7 @@ namespace Zafu.Tasks {
 				if (doNotDisposeCancellationTokenSource == false) {
 					DisposingUtil.DisposeLoggingException(cancellationTokenSource);
 				}
-				// TODO: logging
+				OnValueTaskFinished(valueTask);
 				return null;
 			}
 			// cancellationTokenSource can be null
@@ -237,40 +244,68 @@ namespace Zafu.Tasks {
 
 		#region methods
 
-		protected void Log(Task? task, LogLevel logLevel, string message, Exception? exception = null) {
+		protected void Log(int taskId, LogLevel logLevel, string message, Exception? exception = null, EventId eventId = default(EventId)) {
 			// check argument
-			if (task == null) {
-				throw new ArgumentNullException(nameof(task));
+			if (message == null) {
+				throw new ArgumentNullException(nameof(message));
 			}
+			// exception can be null
 
 			// log
-			Log<int>(logLevel, message, "task-id", task.Id, exception, default(EventId));
+			Log<int>(logLevel, message, "task-id", taskId, exception, eventId);
 		}
 
-		protected void Log(RunningTask? runningTask, LogLevel logLevel, string message, Exception? exception = null) {
+		protected void Log(RunningTask runningTask, LogLevel logLevel, string message, Exception? exception = null, EventId eventId = default(EventId)) {
 			// check argument
 			if (runningTask == null) {
 				throw new ArgumentNullException(nameof(runningTask));
 			}
 
 			// log
-			Log(runningTask.Task, logLevel, message, exception);
+			Log(runningTask.Task.Id, logLevel, message, exception, eventId);
 		}
 
-		protected virtual void OnTaskFinished(Task task) {
+		protected void OnTaskFinished(Task task) {
 			// check argument
 			Debug.Assert(task != null);
 			Debug.Assert(task.IsCompleted);
 
 			Exception? exception = null;
-			if (task.IsFaulted) {
-				AggregateException? aggregateException = task.Exception;
-				Debug.Assert(aggregateException != null);
-				exception = aggregateException.InnerException;
-			} else if (task.IsCanceled) {
-				exception = new TaskCanceledException();
+			try {
+				task.Wait();
+			} catch (AggregateException e) {
+				exception = e.InnerException;
+				Debug.Assert(exception != null);
 			}
-			OnTaskFinishing(task, exception);
+			LogTaskFinished(task.Id, exception);
+		}
+
+		protected void OnValueTaskFinished(ValueTask valueTask) {
+			// check argument
+			Debug.Assert(valueTask.IsCompleted);
+
+			Exception? exception = null;
+			try {
+				valueTask.GetAwaiter().GetResult();
+			} catch (Exception e) {
+				exception = e;
+				Debug.Assert(exception != null);
+			}
+			LogTaskFinished(0, exception);
+		}
+
+		protected void LogTaskFinished(int taskId, Exception? exception) {
+			if (exception == null) {
+				// task is finished successfully
+				if (this.LoggingLevel <= LogLevel.Debug) {
+					Log(taskId, LogLevel.Debug, "The running task finished successfully.");
+				}
+			} else {
+				// task throws an exception
+				if (this.LoggingLevel <= LogLevel.Error) {
+					Log(taskId, LogLevel.Error, "The running task finished with an exception.", exception);
+				}
+			}
 		}
 
 		#endregion
@@ -278,25 +313,19 @@ namespace Zafu.Tasks {
 
 		#region overridables
 
-		protected virtual void OnTaskFinishing(Task task, Exception? exception) {
-			// Note that task is not completed at this point.
-			// That is, task.IsCompleted is false and it does not have final result.
-			// So you cannot use task.IsFaulted, task.IsCanceled, and task.IsCompletedSuccessfully here.
-
+		protected virtual void OnTaskFinishing(IRunningTask runningTask, Exception? exception) {
 			// check argument
-			Debug.Assert(task != null);
-
-			if (exception == null) {
-				// task is finishing successfully
-				if (this.LoggingLevel <= LogLevel.Debug) {
-					Log(task, LogLevel.Debug, "The running task finished successfully.", exception);
-				}
-			} else {
-				// task throws an exception
-				if (this.LoggingLevel <= LogLevel.Error) {
-					Log(task, LogLevel.Error, "The running task ended with an exception.", exception);
-				}
+			if (runningTask == null) {
+				throw new ArgumentNullException(nameof(runningTask));
 			}
+			// exception can be null
+
+			// Note that task may not be completed at this point.
+			// That is, runningTask.Task.IsCompleted is false and it does not have final result.
+			// So you cannot use Task.IsFaulted, Task.IsCanceled, and Task.IsCompletedSuccessfully here.
+
+			// log the result
+			LogTaskFinished(runningTask.Task.Id, exception);
 		}
 
 		#endregion

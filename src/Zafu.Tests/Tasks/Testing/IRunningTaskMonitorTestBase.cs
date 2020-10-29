@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Zafu.Testing;
 using Zafu.Testing.Tasks;
 using Xunit;
-using System.Reflection;
 
 namespace Zafu.Tasks.Testing {
 	public class IRunningTaskMonitorTestBase {
@@ -169,25 +168,6 @@ namespace Zafu.Tasks.Testing {
 	}
 
 	public abstract class IRunningTaskMonitorTestBase<TTarget>: IRunningTaskMonitorTestBase where TTarget: IRunningTaskMonitor {
-		#region overridables
-
-		protected abstract TTarget CreateTarget();
-
-		protected virtual void DisposeTarget(TTarget target) {
-			// do nothing by default
-		}
-
-		/// <summary>
-		/// Runs additional routine assertion on the target.
-		/// </summary>
-		/// <param name="target"></param>
-		protected virtual void AssertTarget(TTarget target) {
-			// do nothing by default
-		}
-
-		#endregion
-
-
 		#region tests
 
 		protected void Test_SimpleAction_Successful(TTarget target, Action<TestingActionState, IRunningTask> assert) {
@@ -394,7 +374,7 @@ namespace Zafu.Tasks.Testing {
 			}
 		}
 
-		protected void Test_Task_Done_Successful(TTarget target, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask, Action<IRunningTask?> assert) {
+		protected void Test_Task_Done_Successful(TTarget target, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask, Action<Task, IRunningTask?> assert) {
 			// arrange
 			Task task = Task.FromResult(0);
 			Debug.Assert(task.IsCompletedSuccessfully);
@@ -403,10 +383,10 @@ namespace Zafu.Tasks.Testing {
 			IRunningTask? runningTask = CallMonitorTask(target, task, cancellationTokenSource, doNotDisposeCancellationTokenSource, targetValueTask);
 
 			// assert
-			assert(runningTask);
+			assert(task, runningTask);
 		}
 
-		protected void Test_Task_Done_Exception(TTarget target, Exception exception, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask, Action<IRunningTask?> assert) {
+		protected void Test_Task_Done_Exception(TTarget target, Exception exception, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask, Action<Task, IRunningTask?> assert) {
 			// arrange
 			Task task = Task.FromException(exception);
 			Debug.Assert(task.IsFaulted);
@@ -415,10 +395,10 @@ namespace Zafu.Tasks.Testing {
 			IRunningTask? runningTask = CallMonitorTask(target, task, cancellationTokenSource, doNotDisposeCancellationTokenSource, targetValueTask);
 
 			// assert
-			assert(runningTask);
+			assert(task, runningTask);
 		}
 
-		protected void Test_Task_Done_Canceled(TTarget target, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask, Action<IRunningTask?> assert) {
+		protected void Test_Task_Done_Canceled(TTarget target, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask, Action<Task, IRunningTask?> assert) {
 			// arrange
 			Task task;
 			using (CancellationTokenSource cts = new CancellationTokenSource()) {
@@ -431,7 +411,7 @@ namespace Zafu.Tasks.Testing {
 			IRunningTask? runningTask = CallMonitorTask(target, task, cancellationTokenSource, doNotDisposeCancellationTokenSource, targetValueTask);
 
 			// assert
-			assert(runningTask);
+			assert(task, runningTask);
 		}
 
 		protected void Test_Task_Running_Successful(TTarget target, CancellationTokenSource? cancellationTokenSource, bool doNotDisposeCancellationTokenSource, bool targetValueTask, Action<TestingActionState, IRunningTask> assert) {

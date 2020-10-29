@@ -1,16 +1,28 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Zafu.Testing;
 using Zafu.Testing.Tasks;
 using Xunit;
-using System.Reflection;
 
 namespace Zafu.Tasks.Testing {
 	public abstract class IRunningTaskMonitorTest<TTarget>: IRunningTaskMonitorTestBase<TTarget> where TTarget : IRunningTaskMonitor {
 		#region overridables
+
+		protected abstract TTarget CreateTarget();
+
+		protected virtual void DisposeTarget(TTarget target) {
+			// do nothing by default
+		}
+
+		/// <summary>
+		/// Runs additional routine assertion on the target.
+		/// </summary>
+		/// <param name="target"></param>
+		protected virtual void AssertTarget(TTarget target) {
+			// do nothing by default
+		}
+
 		#endregion
 
 
@@ -222,7 +234,11 @@ namespace Zafu.Tasks.Testing {
 						cancellationTokenSource: cancellationTokenSource,
 						doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
 						targetValueTask: targetValueTask,
-						assert: (IRunningTask? runningTask) => {
+						assert: (Task task, IRunningTask? runningTask) => {
+							// check argument
+							Debug.Assert(task != null);
+							Debug.Assert(task.IsCompletedSuccessfully);
+
 							// No need to create a RunningTask because the task finished.
 							Assert.Null(runningTask);
 							// run additional routine assertion
@@ -255,7 +271,11 @@ namespace Zafu.Tasks.Testing {
 						cancellationTokenSource: cancellationTokenSource,
 						doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
 						targetValueTask: targetValueTask,
-						assert: (IRunningTask? runningTask) => {
+						assert: (Task task, IRunningTask? runningTask) => {
+							// check argument
+							Debug.Assert(task != null);
+							Debug.Assert(task.IsFaulted);
+
 							// No need to create a RunningTask because the task finished.
 							Assert.Null(runningTask);
 							// run additional routine assertion
@@ -286,7 +306,11 @@ namespace Zafu.Tasks.Testing {
 						cancellationTokenSource: cancellationTokenSource,
 						doNotDisposeCancellationTokenSource: doNotDisposeCancellationTokenSource,
 						targetValueTask: targetValueTask,
-						assert: (IRunningTask? runningTask) => {
+						assert: (Task task, IRunningTask? runningTask) => {
+							// check argument
+							Debug.Assert(task != null);
+							Debug.Assert(task.IsCanceled);
+
 							// No need to create a RunningTask because the task finished.
 							Assert.Null(runningTask);
 							// run additional routine assertion
