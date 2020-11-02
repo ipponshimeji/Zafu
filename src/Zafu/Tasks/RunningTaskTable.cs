@@ -297,13 +297,15 @@ namespace Zafu.Tasks {
 		protected void LogTaskFinished(int taskId, Exception? exception) {
 			if (exception == null) {
 				// task is finished successfully
-				if (this.LoggingLevel <= LogLevel.Debug) {
-					Log(taskId, LogLevel.Debug, "The running task finished successfully.");
+				LogLevel logLevel = LogLevel.Information;
+				if (this.LoggingLevel <= logLevel) {
+					Log(taskId, logLevel, "The running task finished successfully.");
 				}
 			} else {
 				// task throws an exception
-				if (this.LoggingLevel <= LogLevel.Error) {
-					Log(taskId, LogLevel.Error, "The running task finished with an exception.", exception);
+				LogLevel logLevel = LogLevel.Error;
+				if (this.LoggingLevel <= logLevel) {
+					Log(taskId, logLevel, "The running task finished with an exception.", exception);
 				}
 			}
 		}

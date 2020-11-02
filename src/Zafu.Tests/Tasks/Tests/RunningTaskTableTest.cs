@@ -78,6 +78,38 @@ namespace Zafu.Tasks.Tests {
 		#region logging
 
 		public class Logging: IRunningTaskMonitorTestBase<RunningTaskTable> {
+			#region types
+
+			public static class LogDataCreator {
+				#region methods
+
+				public static LogData Create(LogLevel logLevel, string message, Task? task = null, Exception? exception = null, EventId eventId = default(EventId)) {
+					int taskId = (task == null) ? 0 : task.Id;
+					return LogData.CreateWithSimpleState<int>("RunningTaskMonitor", message, "task-id", taskId, logLevel, exception, eventId);
+				}
+
+				public static LogData TaskFailed(Task? task, Exception? exception = null) {
+					return Create(LogLevel.Error, "The running task finished with an exception.", task, exception);
+				}
+
+				public static LogData TaskSucceeded(Task? task) {
+					return Create(LogLevel.Information, "The running task finished successfully.", task);
+				}
+
+				public static LogData Registered(Task? task) {
+					return Create(LogLevel.Debug, "A running task was registered.", task);
+				}
+
+				public static LogData Unregistered(Task? task) {
+					return Create(LogLevel.Debug, "The running task was unregistered.", task);
+				}
+
+				#endregion
+			}
+
+			#endregion
+
+
 			#region utilities
 
 			protected RunningTaskTable CreateTarget(IRunningContext runningContext) {
@@ -113,15 +145,6 @@ namespace Zafu.Tasks.Tests {
 				}
 			}
 
-			protected LogData CreateLogData(LogLevel logLevel, string message, Task? task = null, Exception? exception = null, EventId eventId = default(EventId)) {
-				int taskId = (task == null) ? 0 : task.Id;
-				return LogData.CreateWithSimpleState<int>("RunningTaskMonitor", message, "task-id", taskId, logLevel, exception, eventId);
-			}
-
-			protected LogData CreateErrorLogData(Task? task = null, Exception? exception = null, EventId eventId = default(EventId)) {
-				return CreateLogData(LogLevel.Error, "The running task finished with an exception.", task, exception, eventId);
-			}
-
 			#endregion
 
 
@@ -154,6 +177,52 @@ namespace Zafu.Tasks.Tests {
 
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = Array.Empty<LoggingData>();
+
+						// assert
+						Assert.Equal(expectedLogs, actualLogs);
+					}
+				);
+			}
+
+			[Fact(DisplayName = "simple action; successful; logging level: Information")]
+			public void SimpleAction_Successful_Information() {
+				Test_SimpleAction_Successful(
+					loggingLevel: LogLevel.Information,
+					assert: (IRunningTask runningTask, IEnumerable<LoggingData> actualLogs) => {
+						// check state
+						Debug.Assert(runningTask != null);
+						Task task = runningTask.Task;
+						Debug.Assert(task != null);
+						Debug.Assert(task.IsCompleted);
+
+						// get expected logs
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.TaskSucceeded(task)
+						};
+
+						// assert
+						Assert.Equal(expectedLogs, actualLogs);
+					}
+				);
+			}
+
+			[Fact(DisplayName = "simple action; successful; logging level: Debug")]
+			public void SimpleAction_Successful_Debug() {
+				Test_SimpleAction_Successful(
+					loggingLevel: LogLevel.Debug,
+					assert: (IRunningTask runningTask, IEnumerable<LoggingData> actualLogs) => {
+						// check state
+						Debug.Assert(runningTask != null);
+						Task task = runningTask.Task;
+						Debug.Assert(task != null);
+						Debug.Assert(task.IsCompleted);
+
+						// get expected logs
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.Registered(task),
+							LogDataCreator.TaskSucceeded(task),
+							LogDataCreator.Unregistered(task),
+						};
 
 						// assert
 						Assert.Equal(expectedLogs, actualLogs);
@@ -197,7 +266,34 @@ namespace Zafu.Tasks.Tests {
 
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
-							CreateErrorLogData(task, exception)
+							LogDataCreator.TaskFailed(task, exception)
+						};
+
+						// assert
+						Assert.Equal(expectedLogs, actualLogs);
+					}
+				);
+			}
+
+			[Fact(DisplayName = "simple action; exception; logging level: Debug")]
+			public void SimpleAction_Exception_Debug() {
+				Exception exception = new InvalidOperationException();
+
+				Test_SimpleAction_Exception(
+					loggingLevel: LogLevel.Debug,
+					exception: exception,
+					assert: (IRunningTask runningTask, IEnumerable<LoggingData> actualLogs) => {
+						// check state
+						Debug.Assert(runningTask != null);
+						Task task = runningTask.Task;
+						Debug.Assert(task != null);
+						Debug.Assert(task.IsCompleted);
+
+						// get expected logs
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.Registered(task),
+							LogDataCreator.TaskFailed(task, exception),
+							LogDataCreator.Unregistered(task)
 						};
 
 						// assert
@@ -240,6 +336,28 @@ namespace Zafu.Tasks.Tests {
 				);
 			}
 
+			[Fact(DisplayName = "simple action; try to cancel; logging level: Information")]
+			public void SimpleAction_TryToCancel_Information() {
+				Test_SimpleAction_TryToCancel(
+					loggingLevel: LogLevel.Information,
+					assert: (IRunningTask runningTask, IEnumerable<LoggingData> actualLogs) => {
+						// check state
+						Debug.Assert(runningTask != null);
+						Task task = runningTask.Task;
+						Debug.Assert(task != null);
+						Debug.Assert(task.IsCompleted);
+
+						// get expected logs
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.TaskSucceeded(task)
+						};
+
+						// assert
+						Assert.Equal(expectedLogs, actualLogs);
+					}
+				);
+			}
+
 			private void Test_CancellableAction_Successful(LogLevel loggingLevel, Action<IRunningTask, IEnumerable<LoggingData>> assert) {
 				// check argument
 				if (assert == null) {
@@ -258,17 +376,21 @@ namespace Zafu.Tasks.Tests {
 				});
 			}
 
-			[Fact(DisplayName = "cancellable action; successful; logging level: Error")]
-			public void CancellableAction_Successful_Error() {
+			[Fact(DisplayName = "cancellable action; successful; logging level: Information")]
+			public void CancellableAction_Successful_Information() {
 				Test_CancellableAction_Successful(
-					loggingLevel: LogLevel.Error,
+					loggingLevel: LogLevel.Information,
 					assert: (IRunningTask runningTask, IEnumerable<LoggingData> actualLogs) => {
 						// check state
 						Debug.Assert(runningTask != null);
-						Debug.Assert(runningTask.Task.IsCompleted);
+						Task task = runningTask.Task;
+						Debug.Assert(task != null);
+						Debug.Assert(task.IsCompleted);
 
 						// get expected logs
-						IEnumerable<LoggingData> expectedLogs = Array.Empty<LoggingData>();
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.TaskSucceeded(task)
+						};
 
 						// assert
 						Assert.Equal(expectedLogs, actualLogs);
@@ -314,7 +436,7 @@ namespace Zafu.Tasks.Tests {
 
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
-							CreateErrorLogData(task, exception)
+							LogDataCreator.TaskFailed(task, exception)
 						};
 
 						// assert
@@ -343,17 +465,21 @@ namespace Zafu.Tasks.Tests {
 				});
 			}
 
-			[Fact(DisplayName = "cancellable action; canceled voluntarily; logging level: Error")]
-			public void CancellableAction_CanceledVoluntarily_Error() {
+			[Fact(DisplayName = "cancellable action; canceled voluntarily; logging level: Information")]
+			public void CancellableAction_CanceledVoluntarily_Information() {
 				Test_CancellableAction_CanceledVoluntarily(
-					loggingLevel: LogLevel.Error,
+					loggingLevel: LogLevel.Information,
 					assert: (IRunningTask runningTask, IEnumerable<LoggingData> actualLogs) => {
 						// check state
 						Debug.Assert(runningTask != null);
-						Debug.Assert(runningTask.Task.IsCompleted);
+						Task task = runningTask.Task;
+						Debug.Assert(task != null);
+						Debug.Assert(task.IsCompleted);
 
 						// get expected logs
-						IEnumerable<LoggingData> expectedLogs = Array.Empty<LoggingData>();
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.TaskSucceeded(task)
+						};
 
 						// assert
 						Assert.Equal(expectedLogs, actualLogs);
@@ -395,7 +521,7 @@ namespace Zafu.Tasks.Tests {
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
 							new ExpectedLogData(
-								logData: CreateErrorLogData(task),
+								logData: LogDataCreator.TaskFailed(task),
 								exceptionChecker: e => e is OperationCanceledException
 							)
 						};
@@ -425,10 +551,10 @@ namespace Zafu.Tasks.Tests {
 				});
 			}
 
-			[Fact(DisplayName = "Task; done; successful; logging level: Error")]
-			public void Task_Done_Successful_Error() {
+			[Fact(DisplayName = "Task; done; successful; logging level: Information")]
+			public void Task_Done_Successful_Information() {
 				Test_Task_Done_Successful(
-					loggingLevel: LogLevel.Error,
+					loggingLevel: LogLevel.Information,
 					targetValueTask: false,
 					assert: (Task task, IEnumerable<LoggingData> actualLogs) => {
 						// check argument
@@ -436,7 +562,9 @@ namespace Zafu.Tasks.Tests {
 						Debug.Assert(task.IsCompletedSuccessfully);
 
 						// get expected logs
-						IEnumerable<LoggingData> expectedLogs = Array.Empty<LoggingData>();
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.TaskSucceeded(task)
+						};
 
 						// assert
 						Assert.Equal(expectedLogs, actualLogs);
@@ -444,10 +572,10 @@ namespace Zafu.Tasks.Tests {
 				);
 			}
 
-			[Fact(DisplayName = "ValueTask; done; successful; logging level: Error")]
-			public void ValueTask_Done_Successful_Error() {
+			[Fact(DisplayName = "ValueTask; done; successful; logging level: Information")]
+			public void ValueTask_Done_Successful_Information() {
 				Test_Task_Done_Successful(
-					loggingLevel: LogLevel.Error,
+					loggingLevel: LogLevel.Information,
 					targetValueTask: true,
 					assert: (Task task, IEnumerable<LoggingData> actualLogs) => {
 						// check argument
@@ -455,7 +583,55 @@ namespace Zafu.Tasks.Tests {
 						Debug.Assert(task.IsCompletedSuccessfully);
 
 						// get expected logs
-						IEnumerable<LoggingData> expectedLogs = Array.Empty<LoggingData>();
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.TaskSucceeded(null)
+						};
+
+						// assert
+						Assert.Equal(expectedLogs, actualLogs);
+					}
+				);
+			}
+
+			[Fact(DisplayName = "Task; done; successful; logging level: Debug")]
+			public void Task_Done_Successful_Debug() {
+				Test_Task_Done_Successful(
+					loggingLevel: LogLevel.Debug,
+					targetValueTask: false,
+					assert: (Task task, IEnumerable<LoggingData> actualLogs) => {
+						// check argument
+						Debug.Assert(task != null);
+						Debug.Assert(task.IsCompletedSuccessfully);
+
+						// get expected logs
+						// Note that neither registered nor unregistered log is written
+						// because no running task is created actually.
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.TaskSucceeded(task)
+						};
+
+						// assert
+						Assert.Equal(expectedLogs, actualLogs);
+					}
+				);
+			}
+
+			[Fact(DisplayName = "ValueTask; done; successful; logging level: Debug")]
+			public void ValueTask_Done_Successful_Debug() {
+				Test_Task_Done_Successful(
+					loggingLevel: LogLevel.Debug,
+					targetValueTask: true,
+					assert: (Task task, IEnumerable<LoggingData> actualLogs) => {
+						// check argument
+						Debug.Assert(task != null);
+						Debug.Assert(task.IsCompletedSuccessfully);
+
+						// get expected logs
+						// Note that neither registered nor unregistered log is written
+						// because no running task is created actually.
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.TaskSucceeded(null)
+						};
 
 						// assert
 						Assert.Equal(expectedLogs, actualLogs);
@@ -500,7 +676,7 @@ namespace Zafu.Tasks.Tests {
 
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
-							CreateErrorLogData(task, exception)
+							LogDataCreator.TaskFailed(task, exception)
 						};
 
 						// assert
@@ -523,7 +699,7 @@ namespace Zafu.Tasks.Tests {
 
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
-							CreateErrorLogData(null, exception)
+							LogDataCreator.TaskFailed(null, exception)
 						};
 
 						// assert
@@ -564,7 +740,7 @@ namespace Zafu.Tasks.Tests {
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
 							new ExpectedLogData(
-								logData: CreateErrorLogData(task),
+								logData: LogDataCreator.TaskFailed(task),
 								exceptionChecker: e => e is OperationCanceledException
 							)
 						};
@@ -588,7 +764,7 @@ namespace Zafu.Tasks.Tests {
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
 							new ExpectedLogData(
-								logData: CreateErrorLogData(null),
+								logData: LogDataCreator.TaskFailed(null),
 								exceptionChecker: e => e is OperationCanceledException
 							)
 						};
@@ -618,18 +794,22 @@ namespace Zafu.Tasks.Tests {
 				});
 			}
 
-			[Fact(DisplayName = "Task; running; successful; logging level: Error")]
-			public void Task_Running_Successful_Error() {
+			[Fact(DisplayName = "Task; running; successful; logging level: Information")]
+			public void Task_Running_Successful_Information() {
 				Test_Task_Running_Successful(
-					loggingLevel: LogLevel.Error,
+					loggingLevel: LogLevel.Information,
 					targetValueTask: false,
 					assert: (IRunningTask runningTask, IEnumerable<LoggingData> actualLogs) => {
 						// check state
 						Debug.Assert(runningTask != null);
-						Debug.Assert(runningTask.Task.IsCompleted);
+						Task task = runningTask.Task;
+						Debug.Assert(task != null);
+						Debug.Assert(task.IsCompleted);
 
 						// get expected logs
-						IEnumerable<LoggingData> expectedLogs = Array.Empty<LoggingData>();
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.TaskSucceeded(task)
+						};
 
 						// assert
 						Assert.Equal(expectedLogs, actualLogs);
@@ -637,18 +817,22 @@ namespace Zafu.Tasks.Tests {
 				);
 			}
 
-			[Fact(DisplayName = "ValueTask; running; successful; logging level: Error")]
-			public void ValueTask_Running_Successful_Error() {
+			[Fact(DisplayName = "ValueTask; running; successful; logging level: Information")]
+			public void ValueTask_Running_Successful_Information() {
 				Test_Task_Running_Successful(
-					loggingLevel: LogLevel.Error,
+					loggingLevel: LogLevel.Information,
 					targetValueTask: true,
 					assert: (IRunningTask runningTask, IEnumerable<LoggingData> actualLogs) => {
 						// check state
 						Debug.Assert(runningTask != null);
-						Debug.Assert(runningTask.Task.IsCompleted);
+						Task task = runningTask.Task;
+						Debug.Assert(task != null);
+						Debug.Assert(task.IsCompleted);
 
 						// get expected logs
-						IEnumerable<LoggingData> expectedLogs = Array.Empty<LoggingData>();
+						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
+							LogDataCreator.TaskSucceeded(task)
+						};
 
 						// assert
 						Assert.Equal(expectedLogs, actualLogs);
@@ -692,7 +876,7 @@ namespace Zafu.Tasks.Tests {
 
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
-							CreateErrorLogData(task, exception)
+							LogDataCreator.TaskFailed(task, exception)
 						};
 
 						// assert
@@ -717,7 +901,7 @@ namespace Zafu.Tasks.Tests {
 
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
-							CreateErrorLogData(task, exception)
+							LogDataCreator.TaskFailed(task, exception)
 						};
 
 						// assert
@@ -763,7 +947,7 @@ namespace Zafu.Tasks.Tests {
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
 							new ExpectedLogData(
-								logData: CreateErrorLogData(task),
+								logData: LogDataCreator.TaskFailed(task),
 								exceptionChecker: e => e is OperationCanceledException
 							)
 						};
@@ -789,7 +973,7 @@ namespace Zafu.Tasks.Tests {
 						// get expected logs
 						IEnumerable<LoggingData> expectedLogs = new LoggingData[] {
 							new ExpectedLogData(
-								logData: CreateErrorLogData(task),
+								logData: LogDataCreator.TaskFailed(task),
 								exceptionChecker: e => e is OperationCanceledException
 							)
 						};
